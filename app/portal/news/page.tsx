@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Image as ImageIcon, Plus, Search } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
-import type { SupabaseNewsGalleryImage, SupabaseNewsPost } from "@/lib/news";
+import type { SupabaseNewsPost } from "@/lib/news";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -232,7 +232,8 @@ async function uploadNewsImageToStorage(
   folderId: string,
   filePrefix: string,
 ) {
-  const path = `news/${folderId}/${filePrefix}-${Date.now()}-${safeFileName(
+  const prefix = filePrefix ? `${filePrefix}-` : "";
+  const path = `news/${folderId}/${prefix}${Date.now()}-${safeFileName(
     file.name,
   )}`;
   const { data, error } = await supabase.storage
@@ -262,13 +263,10 @@ export default function PortalNewsPage() {
   const [newsDrafts, setNewsDrafts] = useState<Record<string, NewsPostForm>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [newNewsFolderId, setNewNewsFolderId] = useState<string | null>(null);
   const [newMainImageFile, setNewMainImageFile] = useState<File | null>(null);
-  const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
   const [editMainImageFiles, setEditMainImageFiles] = useState<
     Record<string, File | null>
-  >({});
-  const [editGalleryFiles, setEditGalleryFiles] = useState<
-    Record<string, File[]>
   >({});
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -465,22 +463,65 @@ export default function PortalNewsPage() {
     onValidFile(file);
   };
 
-  const handleGallerySelection = (
-    event: ChangeEvent<HTMLInputElement>,
-    onValidFiles: (files: File[]) => void,
-  ) => {
-    setErrorMessage("");
-    const files = Array.from(event.target.files ?? []);
-    const invalidFile = files.find((file) => validateImageFile(file));
+  const handleGalleryUploadSelection = async ({
+    event,
+    folderId,
+    uploadId,
+    currentGallery,
+    onGalleryChange,
+  }: {
+    event: ChangeEvent<HTMLInputElement>;
+    folderId: string;
+    uploadId: string;
+    currentGallery: GalleryImageForm[];
+    onGalleryChange: (images: GalleryImageForm[]) => void;
+  }) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const invalidFile = selectedFiles.find((file) => validateImageFile(file));
 
     if (invalidFile) {
       setErrorMessage(validateImageFile(invalidFile));
       event.target.value = "";
-      onValidFiles([]);
       return;
     }
 
-    onValidFiles(files);
+    setUploadingId(uploadId);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const uploadedImages = await Promise.all(
+        selectedFiles.map(async (file) => ({
+          url: await uploadNewsImageToStorage(
+            file,
+            `${folderId}/gallery`,
+            "",
+          ),
+          caption: "",
+        })),
+      );
+
+      onGalleryChange([...currentGallery, ...uploadedImages]);
+      setSuccessMessage(
+        `${uploadedImages.length} gallery image${
+          uploadedImages.length === 1 ? "" : "s"
+        } uploaded.`,
+      );
+      event.target.value = "";
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gallery images could not be uploaded.",
+      );
+    } finally {
+      setUploadingId(null);
+    }
   };
 
   const uploadMainImage = async (
@@ -498,32 +539,6 @@ export default function PortalNewsPage() {
 
     try {
       return await uploadNewsImageToStorage(file, folderId, "main");
-    } finally {
-      setUploadingId(null);
-    }
-  };
-
-  const uploadGalleryImages = async (
-    files: File[],
-    folderId: string,
-    currentGallery: GalleryImageForm[],
-    uploadId: string,
-  ) => {
-    if (files.length === 0) {
-      return currentGallery;
-    }
-
-    setUploadingId(uploadId);
-
-    try {
-      const uploadedImages = await Promise.all(
-        files.map(async (file) => ({
-          url: await uploadNewsImageToStorage(file, `${folderId}/gallery`, "gallery"),
-          caption: "",
-        })),
-      );
-
-      return [...currentGallery, ...uploadedImages];
     } finally {
       setUploadingId(null);
     }
@@ -549,7 +564,7 @@ export default function PortalNewsPage() {
     setSaving(true);
 
     try {
-      const folderId = crypto.randomUUID();
+      const folderId = newNewsFolderId ?? crypto.randomUUID();
       const mainImageUrl = await uploadMainImage(
         newMainImageFile,
         folderId,
@@ -557,19 +572,12 @@ export default function PortalNewsPage() {
         newsForm.mainImageUrl,
         "new",
       );
-      const galleryImages = await uploadGalleryImages(
-        newGalleryFiles,
-        folderId,
-        newsForm.galleryImages,
-        "new-gallery",
-      );
       const formToSave = {
         ...newsForm,
         mainImageUrl: mainImageUrl ?? "",
-        galleryImages,
       };
       const { error } = await supabase.from("news_posts").insert({
-        ...getNewsPayload(formToSave, mainImageUrl, galleryImages),
+        ...getNewsPayload(formToSave, mainImageUrl, formToSave.galleryImages),
         created_by: currentUserId,
       });
 
@@ -580,7 +588,7 @@ export default function PortalNewsPage() {
       setSuccessMessage("News post added.");
       setNewsForm(emptyNewsForm);
       setNewMainImageFile(null);
-      setNewGalleryFiles([]);
+      setNewNewsFolderId(null);
       setShowAddForm(false);
       await loadNewsPosts();
     } catch (error) {
@@ -621,20 +629,13 @@ export default function PortalNewsPage() {
         draft.mainImageUrl,
         postId,
       );
-      const galleryImages = await uploadGalleryImages(
-        editGalleryFiles[postId] ?? [],
-        postId,
-        draft.galleryImages,
-        `${postId}-gallery`,
-      );
       const draftToSave = {
         ...draft,
         mainImageUrl: mainImageUrl ?? "",
-        galleryImages,
       };
       const { error } = await supabase
         .from("news_posts")
-        .update(getNewsPayload(draftToSave, mainImageUrl, galleryImages))
+        .update(getNewsPayload(draftToSave, mainImageUrl, draftToSave.galleryImages))
         .eq("id", postId);
 
       if (error) {
@@ -644,7 +645,6 @@ export default function PortalNewsPage() {
       setSuccessMessage("News post updated.");
       setEditingId(null);
       setEditMainImageFiles((current) => ({ ...current, [postId]: null }));
-      setEditGalleryFiles((current) => ({ ...current, [postId]: [] }));
       await loadNewsPosts();
     } catch (error) {
       setErrorMessage(
@@ -732,8 +732,7 @@ export default function PortalNewsPage() {
     onSubmit: (event: FormEvent<HTMLFormElement>) => void,
     mainImageFile: File | null,
     onMainImageChange: (file: File | null) => void,
-    galleryFiles: File[],
-    onGalleryFilesChange: (files: File[]) => void,
+    onGalleryUpload: (event: ChangeEvent<HTMLInputElement>) => void,
     submitLabel: string,
     uploadId: string,
   ) => (
@@ -875,7 +874,22 @@ export default function PortalNewsPage() {
             <p className="text-sm text-muted">No gallery images yet.</p>
           ) : null}
           {form.galleryImages.map((image, index) => (
-            <div key={`${index}-${image.url}`} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+            <div
+              key={`${index}-${image.url}`}
+              className="grid gap-2 rounded-md border border-line bg-white/70 p-2 md:grid-cols-[72px_1fr_1fr_auto]"
+            >
+              {image.url.trim() ? (
+                <div
+                  className="h-14 w-16 rounded-md border border-line bg-cover bg-center"
+                  style={{ backgroundImage: `url(${image.url.trim()})` }}
+                  role="img"
+                  aria-label="Gallery image preview"
+                />
+              ) : (
+                <div className="flex h-14 w-16 items-center justify-center rounded-md border border-dashed border-line text-muted">
+                  <ImageIcon className="h-4 w-4" />
+                </div>
+              )}
               <input
                 value={image.url}
                 onChange={(event) =>
@@ -933,13 +947,12 @@ export default function PortalNewsPage() {
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => handleGallerySelection(event, onGalleryFilesChange)}
+          onChange={onGalleryUpload}
           className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition file:mr-3 file:rounded-md file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand focus:border-brand"
         />
         <span className="text-xs font-normal text-muted">
-          {galleryFiles.length > 0
-            ? `${galleryFiles.length} gallery file(s) selected.`
-            : "Each image must be 5 MB or smaller."}
+          Files upload immediately and are added to the gallery list. Each image
+          must be 5 MB or smaller.
         </span>
       </label>
 
@@ -1048,8 +1061,21 @@ export default function PortalNewsPage() {
                 handleAddNewsPost,
                 newMainImageFile,
                 setNewMainImageFile,
-                newGalleryFiles,
-                setNewGalleryFiles,
+                (event) => {
+                  const folderId = newNewsFolderId ?? crypto.randomUUID();
+                  setNewNewsFolderId(folderId);
+                  void handleGalleryUploadSelection({
+                    event,
+                    folderId,
+                    uploadId: "new-gallery",
+                    currentGallery: newsForm.galleryImages,
+                    onGalleryChange: (images) =>
+                      setNewsForm((current) => ({
+                        ...current,
+                        galleryImages: images,
+                      })),
+                  });
+                },
                 "Add News Post",
                 "new",
               )}
@@ -1219,12 +1245,22 @@ export default function PortalNewsPage() {
                                   ...current,
                                   [post.id]: file,
                                 })),
-                              editGalleryFiles[post.id] ?? [],
-                              (files) =>
-                                setEditGalleryFiles((current) => ({
-                                  ...current,
-                                  [post.id]: files,
-                                })),
+                              (event) => {
+                                void handleGalleryUploadSelection({
+                                  event,
+                                  folderId: post.id,
+                                  uploadId: `${post.id}-gallery`,
+                                  currentGallery: draft.galleryImages,
+                                  onGalleryChange: (images) =>
+                                    setNewsDrafts((current) => ({
+                                      ...current,
+                                      [post.id]: {
+                                        ...draft,
+                                        galleryImages: images,
+                                      },
+                                    })),
+                                });
+                              },
                               "Save News Post",
                               post.id,
                             )}
