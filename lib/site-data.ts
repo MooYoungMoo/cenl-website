@@ -410,9 +410,10 @@ export type PublicationItem = {
   authors: string;
   journal: string;
   year: string;
-  label: "Article" | "Review" | "Featured";
+  label: string;
   doi: string;
   doiUrl?: string;
+  imageUrl?: string;
   imageLabel: string;
   citationCount?: number | null;
 };
@@ -689,6 +690,12 @@ export const portalLinks: PortalLink[] = [
     label: "Budget Dashboard",
     description: "Monitor Funding Source budgets using paid request totals.",
     icon: Wallet,
+  },
+  {
+    href: "/portal/publications",
+    label: "Publications",
+    description: "Manage publication records, visibility, and thumbnails.",
+    icon: FileText,
   },
   {
     href: "/portal/admin",

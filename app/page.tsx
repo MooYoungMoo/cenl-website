@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, FlaskConical, Mail } from "lucide-react";
-import { PublicationCarousel } from "@/components/publication-carousel";
+import { LatestPublicationsSection } from "@/components/latest-publications-section";
 import { SectionHeading } from "@/components/section-heading";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import {
   homeFeatureLinks,
-  latestPublications,
   newsItems,
   quickStats,
   researchTopics,
@@ -62,16 +61,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeading
-          eyebrow="Publications"
-          title="Our Latest Publications"
-          description="A carousel-style preview highlights recent CENL papers and gives the homepage a research-output-first rhythm."
-        />
-        <div className="mt-8">
-          <PublicationCarousel items={latestPublications} />
-        </div>
-      </section>
+      <LatestPublicationsSection />
 
       <section className="mx-auto max-w-7xl px-6 py-16">
         <SectionHeading

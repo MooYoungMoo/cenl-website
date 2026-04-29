@@ -51,10 +51,19 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
             key={item.id}
             className="elevated-card min-w-[82%] snap-start overflow-hidden border border-line bg-white sm:min-w-[48%] lg:min-w-[calc((100%_-_2.5rem)/3)]"
           >
-            <VisualPlaceholder
-              label={item.imageLabel}
-              className="min-h-40 rounded-none"
-            />
+            {item.imageUrl ? (
+              <div
+                className="min-h-40 rounded-none bg-cover bg-center"
+                style={{ backgroundImage: `url(${item.imageUrl})` }}
+                role="img"
+                aria-label={item.imageLabel}
+              />
+            ) : (
+              <VisualPlaceholder
+                label={item.imageLabel}
+                className="min-h-40 rounded-none"
+              />
+            )}
             <div className="p-6">
               <span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
                 {item.label}

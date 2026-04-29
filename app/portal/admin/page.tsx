@@ -447,7 +447,11 @@ export default function AdminPage() {
     );
 
     if (canManage(nextRole)) {
-      await Promise.all([loadFundingSources(), loadMerchantReviews(), loadProfiles()]);
+      await Promise.all([
+        loadFundingSources(),
+        loadMerchantReviews(),
+        loadProfiles(),
+      ]);
     } else if (hasProjectAdminAccess) {
       await loadMerchantReviews();
     }
@@ -1345,7 +1349,7 @@ export default function AdminPage() {
   return (
     <PortalShell
       title="Admin"
-      description="Manage funding sources and review new merchant records."
+      description="Manage funding sources, project admins, users, and merchant records."
     >
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Admin
@@ -1353,8 +1357,8 @@ export default function AdminPage() {
       <h2 className="mt-4 text-3xl font-semibold">Lab portal operations</h2>
       <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
         Manage the lightweight operational records used by payment tracking.
-        Full content management, file uploads, and notifications are still
-        intentionally out of scope.
+        Publication records now live in the dedicated Publications portal page;
+        file uploads and notifications are still intentionally out of scope.
       </p>
       <p className="mt-2 max-w-2xl text-xs leading-6 text-muted">
         profiles.role controls global student/professor/admin access.
