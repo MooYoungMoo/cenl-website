@@ -45,10 +45,7 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div
-        ref={scrollerRef}
-        className="flex snap-x gap-5 overflow-x-auto pb-4"
-      >
+      <div ref={scrollerRef} className="flex snap-x gap-5 overflow-x-auto pb-4">
         {items.map((item) => (
           <article
             key={item.id}
@@ -67,8 +64,20 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
               </h3>
               <p className="mt-3 text-sm leading-6 text-muted">{item.authors}</p>
               <p className="mt-3 text-sm font-medium text-foreground">
-                {item.journal} · {item.year}
+                {item.journal} | {item.year}
               </p>
+              {item.doiUrl ? (
+                <a
+                  href={item.doiUrl}
+                  className="mt-3 inline-flex text-sm font-medium text-brand transition hover:text-foreground"
+                >
+                  DOI
+                </a>
+              ) : (
+                <p className="mt-3 text-sm font-medium text-muted">
+                  DOI: {item.doi}
+                </p>
+              )}
             </div>
           </article>
         ))}

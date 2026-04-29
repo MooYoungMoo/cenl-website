@@ -35,8 +35,20 @@ export default function PapersPage() {
                   <h2 className="mt-4 text-xl font-semibold">{paper.title}</h2>
                   <p className="mt-3 text-sm leading-7 text-muted">{paper.authors}</p>
                   <p className="mt-1 text-sm text-muted">
-                    {paper.journal} · {paper.year}
+                    {paper.journal} | {paper.year}
                   </p>
+                  {paper.doiUrl ? (
+                    <a
+                      href={paper.doiUrl}
+                      className="mt-4 inline-flex text-sm font-medium text-brand transition hover:text-foreground"
+                    >
+                      DOI: {paper.doi}
+                    </a>
+                  ) : (
+                    <p className="mt-4 text-sm font-medium text-muted">
+                      DOI: {paper.doi}
+                    </p>
+                  )}
                   <p className="mt-4 text-xs font-medium uppercase tracking-[0.14em] text-muted">
                     Citations placeholder ready
                   </p>

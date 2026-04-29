@@ -413,99 +413,51 @@ export type PublicationItem = {
   journal: string;
   year: string;
   label: "Article" | "Review" | "Featured";
+  doi: string;
+  doiUrl?: string;
   imageLabel: string;
   citationCount?: number | null;
 };
 
 export const publicationItems: PublicationItem[] = [
   {
-    id: "chemoelectronic-nanomaterial-arrays",
-    title: "Chemoelectronic Nanomaterial Arrays for Selective Vapor Recognition",
-    authors: "CENL Research Team",
-    journal: "Advanced Sensing Materials",
-    year: "2026",
-    label: "Featured",
-    imageLabel: "Graphical abstract placeholder",
-    citationCount: null,
-  },
-  {
-    id: "drift-aware-electronic-nose",
-    title: "Drift-Aware Learning for Electronic Nose Measurements",
-    authors: "CENL Research Team",
-    journal: "Chemical Sensor Systems",
+    id: "methanol-ethanol-discrimination-conductive-mofs",
+    title:
+      "Methanol-Ethanol Discrimination and Selective Sensing Enabled by Molecular Sieving in Conductive MOFs",
+    authors: "Young-Moo Jo†, Mingyu Jeon†, Dong-Ha Kim, Jihan Kim, Mircea Dincă*",
+    journal: "Advanced Materials",
     year: "2026",
     label: "Article",
-    imageLabel: "Signal map placeholder",
+    doi: "TBD",
+    imageLabel: "Publication image placeholder",
     citationCount: null,
   },
   {
-    id: "surface-functionalized-sensing-films",
-    title: "Surface-Functionalized Sensing Films for Portable Chemical Detection",
-    authors: "CENL Research Team",
-    journal: "Nanomaterials Interfaces",
+    id: "functionalized-carbon-nanotube-integrated-sensors",
+    title:
+      "Tunable and Highly-Sensitive Functionalized Carbon Nanotube-Based Integrated Sensors for Chemical Gas Sensing",
+    authors:
+      "Jaekang Song†, Dong-Ha Kim†, Jan Tiepelt, Young-Moo Jo, Graham McGrath, Michael Song, Tianyang Chen, Jiande Wang, Max Shulaker*, Mircea Dincă*, Marc Baldo*",
+    journal: "Nature Sensors",
+    year: "2026",
+    label: "Article",
+    doi: "https://www.nature.com/articles/s44460-026-00037-z",
+    doiUrl: "https://www.nature.com/articles/s44460-026-00037-z",
+    imageLabel: "Publication image placeholder",
+    citationCount: null,
+  },
+  {
+    id: "photoactivated-conductive-mof-thin-film-arrays",
+    title:
+      "Photoactivated Conductive MOF Thin Film Arrays on Micro-LEDs for Chemiresistive Gas Sensing",
+    authors:
+      "K. Lee†, Y.-M. Jo*†, M. S. Sohn†, M. Jeon, C. Kim, O. Gul, S. J. Park, K. B. Kim, K. S. Chang, C. B. Jeong, J. Kim, Y. C. Kang*, I. Park*",
+    journal: "Nature Communications",
     year: "2025",
     label: "Article",
-    imageLabel: "Nanofilm cover placeholder",
-    citationCount: null,
-  },
-  {
-    id: "chemoelectronic-interfaces-voc",
-    title: "Chemoelectronic Interfaces for Volatile Organic Compound Analysis",
-    authors: "CENL Research Team",
-    journal: "Materials Chemistry Reviews",
-    year: "2025",
-    label: "Review",
-    imageLabel: "Review cover placeholder",
-    citationCount: null,
-  },
-  {
-    id: "modular-sensor-cartridges",
-    title: "Modular Sensor Cartridges for Laboratory Electronic Nose Platforms",
-    authors: "CENL Research Team",
-    journal: "Device Engineering Letters",
-    year: "2025",
-    label: "Article",
-    imageLabel: "Device module placeholder",
-    citationCount: null,
-  },
-  {
-    id: "hybrid-nanomaterial-films",
-    title: "Hybrid Nanomaterial Films with Tunable Chemical Affinity",
-    authors: "CENL Research Team",
-    journal: "Functional Materials Reports",
-    year: "2024",
-    label: "Featured",
-    imageLabel: "Hybrid film placeholder",
-    citationCount: null,
-  },
-  {
-    id: "interpretable-vapor-classification",
-    title: "Interpretable Classification of Complex Vapor Mixtures",
-    authors: "CENL Research Team",
-    journal: "Sensors and Data Science",
-    year: "2024",
-    label: "Article",
-    imageLabel: "Data pattern placeholder",
-    citationCount: null,
-  },
-  {
-    id: "low-power-readout",
-    title: "Low-Power Readout Strategies for Nanomaterial Sensor Arrays",
-    authors: "CENL Research Team",
-    journal: "Electronic Materials Systems",
-    year: "2024",
-    label: "Article",
-    imageLabel: "Circuit cover placeholder",
-    citationCount: null,
-  },
-  {
-    id: "electronic-nose-benchmarking",
-    title: "Benchmarking Protocols for Electronic Nose Experiments",
-    authors: "CENL Research Team",
-    journal: "Analytical Methods Placeholder",
-    year: "2023",
-    label: "Review",
-    imageLabel: "Protocol cover placeholder",
+    doi: "https://www.nature.com/articles/s41467-025-64602-9",
+    doiUrl: "https://www.nature.com/articles/s41467-025-64602-9",
+    imageLabel: "Publication image placeholder",
     citationCount: null,
   },
 ];
