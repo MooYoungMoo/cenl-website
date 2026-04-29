@@ -12,6 +12,7 @@ type FundingSource = {
   funding_agency?: string | null;
   project_code?: string | null;
   project_title?: string | null;
+  currency?: string | null;
   materials_budget?: number | null;
   activities_budget?: number | null;
   is_active?: boolean | null;
@@ -61,6 +62,41 @@ function normalizeMerchantName(value: string) {
 
 function formatAmount(value: number, currency = "KRW") {
   return `${value.toLocaleString()} ${currency}`;
+}
+
+function getUsagePercent(paid: number, budget: number) {
+  if (budget <= 0) {
+    return paid > 0 ? 100 : 0;
+  }
+
+  return Math.min(100, Math.max(0, (paid / budget) * 100));
+}
+
+function UsageBar({
+  label,
+  paid,
+  budget,
+}: {
+  label: string;
+  paid: number;
+  budget: number;
+}) {
+  const percent = getUsagePercent(paid, budget);
+
+  return (
+    <div className="mt-4">
+      <div className="flex justify-between gap-3 text-xs text-muted">
+        <span>{label} usage</span>
+        <span>{Math.round(percent)}%</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-line/70">
+        <div
+          className="h-full rounded-full bg-brand/70 transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function getFundingMetadata(source: FundingSource) {
@@ -207,6 +243,35 @@ export default function BudgetDashboardPage() {
     [merchantMap, requests],
   );
 
+  const budgetTotals = useMemo(
+    () =>
+      budgetSummaries.reduce(
+        (totals, summary) => {
+          const materialsRemaining =
+            summary.materialsBudget - summary.materialsPaid;
+          const activitiesRemaining =
+            summary.activitiesBudget - summary.activitiesPaid;
+
+          return {
+            activeSources: totals.activeSources + 1,
+            materialsRemaining:
+              totals.materialsRemaining + materialsRemaining,
+            activitiesRemaining:
+              totals.activitiesRemaining + activitiesRemaining,
+            totalRemaining:
+              totals.totalRemaining + materialsRemaining + activitiesRemaining,
+          };
+        },
+        {
+          activeSources: 0,
+          materialsRemaining: 0,
+          activitiesRemaining: 0,
+          totalRemaining: 0,
+        },
+      ),
+    [budgetSummaries],
+  );
+
   return (
     <PortalShell
       title="Budget Dashboard"
@@ -253,13 +318,55 @@ export default function BudgetDashboardPage() {
       ) : null}
 
       {!loading && budgetSummaries.length > 0 ? (
-        <div className="mt-8 grid gap-5">
+        <section className="mt-8 grid gap-3 md:grid-cols-4">
+          <div className="rounded-md border border-line bg-white/75 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Active Sources
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {budgetTotals.activeSources}
+            </p>
+          </div>
+          <div className="rounded-md border border-line bg-white/75 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Materials Remaining
+            </p>
+            <p className="mt-2 text-lg font-semibold text-brand">
+              {formatAmount(budgetTotals.materialsRemaining)}
+            </p>
+          </div>
+          <div className="rounded-md border border-line bg-white/75 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Activities Remaining
+            </p>
+            <p className="mt-2 text-lg font-semibold text-brand">
+              {formatAmount(budgetTotals.activitiesRemaining)}
+            </p>
+          </div>
+          <div className="rounded-md border border-line bg-brand-soft p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+              Total Remaining
+            </p>
+            <p className="mt-2 text-lg font-semibold text-brand">
+              {formatAmount(budgetTotals.totalRemaining)}
+            </p>
+          </div>
+        </section>
+      ) : null}
+
+      {!loading && budgetSummaries.length > 0 ? (
+        <div className="mt-6 grid gap-5">
           {budgetSummaries.map((summary) => {
             const materialsRemaining =
               summary.materialsBudget - summary.materialsPaid;
             const activitiesRemaining =
               summary.activitiesBudget - summary.activitiesPaid;
+            const materialsTotal = summary.materialsBudget;
+            const activitiesTotal = summary.activitiesBudget;
+            const totalBudget = materialsTotal + activitiesTotal;
+            const totalPaid = summary.materialsPaid + summary.activitiesPaid;
             const totalRemaining = materialsRemaining + activitiesRemaining;
+            const currency = summary.source.currency ?? "KRW";
             const fundingMetadata = getFundingMetadata(summary.source);
 
             return (
@@ -291,10 +398,39 @@ export default function BudgetDashboardPage() {
                   <div className="rounded-md bg-brand-soft px-4 py-3 text-right">
                     <p className="text-sm text-muted">Total remaining</p>
                     <p className="mt-1 text-xl font-semibold text-brand">
-                      {formatAmount(totalRemaining)}
+                      {formatAmount(totalRemaining, currency)}
                     </p>
                   </div>
                 </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-md border border-line/70 bg-white/75 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                      Total Budget
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {formatAmount(totalBudget, currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-line/70 bg-white/75 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                      Total Paid
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {formatAmount(totalPaid, currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-line/70 bg-brand-soft p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+                      Total Remaining
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-brand">
+                      {formatAmount(totalRemaining, currency)}
+                    </p>
+                  </div>
+                </div>
+
+                <UsageBar label="Total" paid={totalPaid} budget={totalBudget} />
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-2">
                   <div className="rounded-md border border-line/70 bg-white/75 p-4">
@@ -305,22 +441,27 @@ export default function BudgetDashboardPage() {
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted">Budget</dt>
                         <dd className="font-semibold">
-                          {formatAmount(summary.materialsBudget)}
+                          {formatAmount(summary.materialsBudget, currency)}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted">Paid</dt>
                         <dd className="font-semibold">
-                          {formatAmount(summary.materialsPaid)}
+                          {formatAmount(summary.materialsPaid, currency)}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4 border-t border-line pt-3">
                         <dt className="text-muted">Remaining</dt>
                         <dd className="font-semibold text-brand">
-                          {formatAmount(materialsRemaining)}
+                          {formatAmount(materialsRemaining, currency)}
                         </dd>
                       </div>
                     </dl>
+                    <UsageBar
+                      label="Materials"
+                      paid={summary.materialsPaid}
+                      budget={summary.materialsBudget}
+                    />
                   </div>
 
                   <div className="rounded-md border border-line/70 bg-white/75 p-4">
@@ -331,22 +472,27 @@ export default function BudgetDashboardPage() {
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted">Budget</dt>
                         <dd className="font-semibold">
-                          {formatAmount(summary.activitiesBudget)}
+                          {formatAmount(summary.activitiesBudget, currency)}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted">Paid</dt>
                         <dd className="font-semibold">
-                          {formatAmount(summary.activitiesPaid)}
+                          {formatAmount(summary.activitiesPaid, currency)}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4 border-t border-line pt-3">
                         <dt className="text-muted">Remaining</dt>
                         <dd className="font-semibold text-brand">
-                          {formatAmount(activitiesRemaining)}
+                          {formatAmount(activitiesRemaining, currency)}
                         </dd>
                       </div>
                     </dl>
+                    <UsageBar
+                      label="Activities"
+                      paid={summary.activitiesPaid}
+                      budget={summary.activitiesBudget}
+                    />
                   </div>
                 </div>
               </article>
@@ -358,7 +504,7 @@ export default function BudgetDashboardPage() {
       {!loading ? (
         <section className="mt-10">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-            Pending Merchant Queue
+            Unassigned Pending Payments
           </p>
           <h3 className="mt-3 text-2xl font-semibold">
             Not yet assigned to funding sources

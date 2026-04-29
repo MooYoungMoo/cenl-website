@@ -50,6 +50,10 @@ type FundingUsage = {
   funding_source_id: string | null;
 };
 
+type MerchantUsage = {
+  merchant_id: string | null;
+};
+
 const emptyFundingForm: FundingSourceForm = {
   name: "",
   fundingAgency: "",
@@ -114,6 +118,7 @@ export default function AdminPage() {
   const [usedFundingSourceIds, setUsedFundingSourceIds] = useState<string[]>(
     [],
   );
+  const [usedMerchantIds, setUsedMerchantIds] = useState<string[]>([]);
   const [merchantReviews, setMerchantReviews] = useState<MerchantReview[]>([]);
   const [fundingForm, setFundingForm] =
     useState<FundingSourceForm>(emptyFundingForm);
@@ -138,6 +143,27 @@ export default function AdminPage() {
   const inactiveFundingSources = useMemo(
     () => fundingSources.filter((source) => source.is_active === false),
     [fundingSources],
+  );
+
+  const needsReviewMerchants = useMemo(
+    () =>
+      merchantReviews.filter(
+        (merchant) => merchant.is_active !== false && merchant.needs_review,
+      ),
+    [merchantReviews],
+  );
+
+  const activeMerchants = useMemo(
+    () =>
+      merchantReviews.filter(
+        (merchant) => merchant.is_active !== false && !merchant.needs_review,
+      ),
+    [merchantReviews],
+  );
+
+  const inactiveMerchants = useMemo(
+    () => merchantReviews.filter((merchant) => merchant.is_active === false),
+    [merchantReviews],
   );
 
   const loadFundingSources = useCallback(async () => {
@@ -182,19 +208,25 @@ export default function AdminPage() {
   }, []);
 
   const loadMerchantReviews = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("merchants")
-      .select("id, name, normalized_name, needs_review, is_active")
-      .eq("needs_review", true)
-      .order("created_at", { ascending: false });
+    const [merchantsResult, usageResult] = await Promise.all([
+      supabase
+        .from("merchants")
+        .select("id, name, normalized_name, needs_review, is_active")
+        .order("is_active", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase
+        .from("purchase_requests")
+        .select("merchant_id")
+        .not("merchant_id", "is", null),
+    ]);
 
-    if (error) {
+    if (merchantsResult.error) {
       setMerchantReviews([]);
-      setErrorMessage(error.message);
+      setErrorMessage(merchantsResult.error.message);
       return;
     }
 
-    const nextMerchants = (data ?? []) as MerchantReview[];
+    const nextMerchants = (merchantsResult.data ?? []) as MerchantReview[];
     setMerchantReviews(nextMerchants);
     setMerchantDrafts(
       nextMerchants.reduce<Record<string, string>>((accumulator, merchant) => {
@@ -202,6 +234,13 @@ export default function AdminPage() {
         return accumulator;
       }, {}),
     );
+
+    if (!usageResult.error) {
+      const usedIds = ((usageResult.data ?? []) as MerchantUsage[])
+        .map((row) => row.merchant_id)
+        .filter((id): id is string => Boolean(id));
+      setUsedMerchantIds(Array.from(new Set(usedIds)));
+    }
   }, []);
 
   const loadAdminData = useCallback(async () => {
@@ -558,6 +597,66 @@ export default function AdminPage() {
     await loadMerchantReviews();
   };
 
+  const handleReactivateMerchant = async (merchantId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("merchants")
+      .update({ is_active: true })
+      .eq("id", merchantId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Merchant reactivated.");
+    setSaving(false);
+    await loadMerchantReviews();
+  };
+
+  const handleDeleteMerchant = async (merchantId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (usedMerchantIds.includes(merchantId)) {
+      setErrorMessage(
+        "This merchant is linked to purchase records and should remain deactivated instead of deleted.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this inactive unused merchant? This cannot be undone.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("merchants")
+      .delete()
+      .eq("id", merchantId);
+
+    if (error) {
+      setErrorMessage(
+        "This merchant is linked to purchase records and should remain deactivated instead of deleted.",
+      );
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Inactive unused merchant deleted.");
+    setSaving(false);
+    await loadMerchantReviews();
+  };
+
   const renderFundingMetadata = (source: FundingSource) => {
     const metadata = [
       source.funding_agency ? `Agency: ${source.funding_agency}` : "",
@@ -573,6 +672,126 @@ export default function AdminPage() {
       <p className="mt-2 text-xs leading-5 text-muted">{metadata.join(" / ")}</p>
     );
   };
+
+  const renderMerchantList = (
+    title: string,
+    merchants: MerchantReview[],
+    variant: "review" | "active" | "inactive",
+  ) => (
+    <div className="rounded-md border border-line bg-white/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
+          {title}
+        </p>
+        <span className="text-xs font-semibold text-muted">
+          {merchants.length}
+        </span>
+      </div>
+
+      {merchants.length === 0 ? (
+        <p className="px-3 py-4 text-sm text-muted">No merchants in this section.</p>
+      ) : null}
+
+      <div className="divide-y divide-line">
+        {merchants.map((merchant) => {
+          const draftName = merchantDrafts[merchant.id] ?? merchant.name;
+          const normalizedPreview = normalizeMerchantName(draftName);
+
+          return (
+            <div
+              key={merchant.id}
+              className="grid gap-2 px-3 py-2 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={draftName}
+                    onChange={(event) =>
+                      setMerchantDrafts((current) => ({
+                        ...current,
+                        [merchant.id]: event.target.value,
+                      }))
+                    }
+                    className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-1.5 text-sm font-semibold outline-none transition focus:border-brand"
+                    aria-label={`Edit ${merchant.name}`}
+                  />
+                  {merchant.needs_review ? (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
+                      Needs review
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  normalized: {merchant.normalized_name}
+                </p>
+                {normalizedPreview !== merchant.normalized_name ? (
+                  <p className="mt-0.5 text-xs text-muted">
+                    new normalized: {normalizedPreview || "TBD"}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                {variant !== "inactive" ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleSaveMerchantName(merchant.id)}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
+                    >
+                      Edit name
+                    </button>
+                    {merchant.needs_review ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          void handleMarkMerchantReviewed(merchant.id)
+                        }
+                        className="rounded-md border border-brand/30 bg-brand-soft px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                      >
+                        Mark reviewed
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleDeactivateMerchant(merchant.id)}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                    >
+                      Deactivate
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleReactivateMerchant(merchant.id)}
+                      className="rounded-md border border-brand/30 bg-brand-soft px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                    >
+                      Reactivate
+                    </button>
+                    {!usedMerchantIds.includes(merchant.id) ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleDeleteMerchant(merchant.id)}
+                        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <PortalShell
@@ -978,92 +1197,30 @@ export default function AdminPage() {
 
           <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Merchant Review
+              Merchant Management
             </p>
             <h3 className="mt-3 text-2xl font-semibold">
-              New merchants needing review
+              Compact merchant list
             </h3>
             <p className="mt-3 text-sm leading-7 text-muted">
-              Review display names for newly added merchants. Deactivate
-              obvious duplicates or incorrect entries; merging can be added
-              later.
+              Edit merchant display names, review newly added merchants, and
+              deactivate incorrect entries without deleting merchant history.
+              Deactivated merchants remain visible here but no longer appear in
+              the purchase request selector.
             </p>
 
-            <div className="mt-6 grid gap-3">
-              {merchantReviews.length === 0 ? (
-                <div className="rounded-md border border-dashed border-line p-6 text-sm text-muted">
-                  No merchants need review.
-                </div>
-              ) : null}
-
-              {merchantReviews.map((merchant) => {
-                const draftName = merchantDrafts[merchant.id] ?? merchant.name;
-                const normalizedPreview = normalizeMerchantName(draftName);
-
-                return (
-                  <article
-                    key={merchant.id}
-                    className="rounded-md border border-line bg-white/75 p-4"
-                  >
-                    <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-                      <div>
-                        <input
-                          value={draftName}
-                          onChange={(event) =>
-                            setMerchantDrafts((current) => ({
-                              ...current,
-                              [merchant.id]: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-brand"
-                        />
-                        <p className="mt-2 text-xs text-muted">
-                          Current normalized: {merchant.normalized_name}
-                        </p>
-                        <p className="mt-1 text-xs text-muted">
-                          New normalized: {normalizedPreview || "TBD"}
-                        </p>
-                        <p className="mt-1 text-xs text-muted">
-                          Status:{" "}
-                          {merchant.is_active === false ? "inactive" : "active"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2 lg:justify-end">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() =>
-                            void handleSaveMerchantName(merchant.id)
-                          }
-                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
-                        >
-                          Save Name
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() =>
-                            void handleMarkMerchantReviewed(merchant.id)
-                          }
-                          className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
-                        >
-                          Mark Reviewed
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving || merchant.is_active === false}
-                          onClick={() =>
-                            void handleDeactivateMerchant(merchant.id)
-                          }
-                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
-                        >
-                          Deactivate
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="mt-6 grid gap-4">
+              {renderMerchantList(
+                "Needs Review Merchants",
+                needsReviewMerchants,
+                "review",
+              )}
+              {renderMerchantList("Active Merchants", activeMerchants, "active")}
+              {renderMerchantList(
+                "Inactive Merchants",
+                inactiveMerchants,
+                "inactive",
+              )}
             </div>
           </section>
         </div>

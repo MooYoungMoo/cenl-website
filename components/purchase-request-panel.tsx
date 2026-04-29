@@ -81,6 +81,9 @@ const requestSelect =
 
 const fundingSourceSelect = "id, name";
 
+const inactiveMerchantMessage =
+  "This merchant exists but is inactive. Please ask an admin to reactivate or rename it.";
+
 function normalizeMerchantName(value: string) {
   return value
     .trim()
@@ -343,6 +346,37 @@ export function PurchaseRequestPanel() {
     setSubmitError("");
     setSuccessMessage("");
 
+    const activeMerchant = merchants.find(
+      (merchant) => merchant.normalized_name === normalizedName,
+    );
+
+    if (activeMerchant) {
+      selectMerchant(activeMerchant, "Using existing merchant record.");
+      setAddingMerchant(false);
+      return;
+    }
+
+    const { data: existingMerchant } = await supabase
+      .from("merchants")
+      .select(merchantSelect)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+
+    if (existingMerchant) {
+      const merchant = existingMerchant as Merchant;
+
+      if (merchant.is_active === false) {
+        setSelectedMerchant(null);
+        setSubmitError(inactiveMerchantMessage);
+        setAddingMerchant(false);
+        return;
+      }
+
+      selectMerchant(merchant, "Using existing merchant record.");
+      setAddingMerchant(false);
+      return;
+    }
+
     const {
       data: { user },
       error: userError,
@@ -380,27 +414,56 @@ export function PurchaseRequestPanel() {
 
     await loadMerchants();
 
-    const existingMerchant =
-      merchants.find((merchant) => merchant.normalized_name === normalizedName) ??
-      ((await supabase
-        .from("merchants")
-        .select(merchantSelect)
-        .eq("normalized_name", normalizedName)
-        .maybeSingle()).data as Merchant | null);
+    const { data: matchingActiveMerchant } = await supabase
+      .from("merchants")
+      .select(merchantSelect)
+      .eq("normalized_name", normalizedName)
+      .eq("is_active", true)
+      .maybeSingle();
 
-    if (existingMerchant) {
+    if (matchingActiveMerchant) {
+      const merchant = matchingActiveMerchant as Merchant;
       setMerchantMap((current) => ({
         ...current,
-        [existingMerchant.id]: existingMerchant,
+        [merchant.id]: merchant,
       }));
-      selectMerchant(existingMerchant, "Using existing merchant record.");
+      selectMerchant(merchant, "Using existing merchant record.");
       setAddingMerchant(false);
       return;
     }
 
-    setSubmitError(
-      error?.message ?? "Could not add this merchant. Please try again.",
-    );
+    const { data: conflictingMerchant } = await supabase
+        .from("merchants")
+        .select(merchantSelect)
+        .eq("normalized_name", normalizedName)
+      .maybeSingle();
+
+    if (conflictingMerchant) {
+      const merchant = conflictingMerchant as Merchant;
+
+      if (merchant.is_active === false) {
+        setSelectedMerchant(null);
+        setSubmitError(inactiveMerchantMessage);
+        setAddingMerchant(false);
+        return;
+      }
+
+      setMerchantMap((current) => ({
+        ...current,
+        [merchant.id]: merchant,
+      }));
+      selectMerchant(merchant, "Using existing merchant record.");
+      setAddingMerchant(false);
+      return;
+    }
+
+    if (error?.message.toLowerCase().includes("duplicate")) {
+      setSubmitError(inactiveMerchantMessage);
+    } else {
+      setSubmitError(
+        error?.message ?? "Could not add this merchant. Please try again.",
+      );
+    }
     setAddingMerchant(false);
   };
 
@@ -513,6 +576,25 @@ export function PurchaseRequestPanel() {
       return;
     }
 
+    const { data: currentMerchant, error: merchantError } = await supabase
+      .from("merchants")
+      .select(merchantSelect)
+      .eq("id", selectedMerchant.id)
+      .maybeSingle();
+
+    if (merchantError || !currentMerchant) {
+      setSubmitError("Please select the merchant again before submitting.");
+      return;
+    }
+
+    const submissionMerchant = currentMerchant as Merchant;
+
+    if (submissionMerchant.is_active === false) {
+      setSelectedMerchant(null);
+      setSubmitError(inactiveMerchantMessage);
+      return;
+    }
+
     if (!itemName || !purpose || !form.estimatedCost.trim()) {
       setSubmitError("Please enter the item name, estimated cost, and purpose.");
       return;
@@ -538,8 +620,8 @@ export function PurchaseRequestPanel() {
 
     const { error } = await supabase.from("purchase_requests").insert({
       requester_id: user.id,
-      merchant_id: selectedMerchant.id,
-      merchant: selectedMerchant.name,
+      merchant_id: submissionMerchant.id,
+      merchant: submissionMerchant.name,
       item_name: itemName,
       cost_category: form.costCategory,
       estimated_cost: estimatedCost,
