@@ -9,6 +9,9 @@ type CostCategory = "materials" | "activities";
 type FundingSource = {
   id: string;
   name: string;
+  funding_agency?: string | null;
+  project_code?: string | null;
+  project_title?: string | null;
   materials_budget?: number | null;
   activities_budget?: number | null;
   is_active?: boolean | null;
@@ -58,6 +61,14 @@ function normalizeMerchantName(value: string) {
 
 function formatAmount(value: number, currency = "KRW") {
   return `${value.toLocaleString()} ${currency}`;
+}
+
+function getFundingMetadata(source: FundingSource) {
+  return [
+    source.funding_agency ? `Agency: ${source.funding_agency}` : "",
+    source.project_code ? `Code: ${source.project_code}` : "",
+    source.project_title ? `Project: ${source.project_title}` : "",
+  ].filter(Boolean);
 }
 
 function getSourceBudget(source: FundingSource, category: CostCategory) {
@@ -249,6 +260,7 @@ export default function BudgetDashboardPage() {
             const activitiesRemaining =
               summary.activitiesBudget - summary.activitiesPaid;
             const totalRemaining = materialsRemaining + activitiesRemaining;
+            const fundingMetadata = getFundingMetadata(summary.source);
 
             return (
               <article
@@ -263,6 +275,18 @@ export default function BudgetDashboardPage() {
                     <h3 className="mt-2 text-2xl font-semibold">
                       {summary.source.name}
                     </h3>
+                    {fundingMetadata.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {fundingMetadata.map((metadata) => (
+                          <span
+                            key={metadata}
+                            className="rounded-full border border-line bg-white/75 px-3 py-1 text-xs font-semibold text-muted"
+                          >
+                            {metadata}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="rounded-md bg-brand-soft px-4 py-3 text-right">
                     <p className="text-sm text-muted">Total remaining</p>

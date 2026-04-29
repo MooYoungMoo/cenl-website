@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { PortalShell } from "@/components/portal-shell";
 import { supabase } from "@/lib/supabase/client";
@@ -12,17 +12,24 @@ type Profile = {
 type FundingSource = {
   id: string;
   name: string;
+  funding_agency: string | null;
+  project_code: string | null;
+  project_title: string | null;
   description: string | null;
   currency: string | null;
   materials_budget: number | null;
   activities_budget: number | null;
   start_date: string | null;
   end_date: string | null;
+  finished_at: string | null;
   is_active: boolean | null;
 };
 
 type FundingSourceForm = {
   name: string;
+  fundingAgency: string;
+  projectCode: string;
+  projectTitle: string;
   description: string;
   currency: string;
   materialsBudget: string;
@@ -39,8 +46,15 @@ type MerchantReview = {
   is_active: boolean | null;
 };
 
+type FundingUsage = {
+  funding_source_id: string | null;
+};
+
 const emptyFundingForm: FundingSourceForm = {
   name: "",
+  fundingAgency: "",
+  projectCode: "",
+  projectTitle: "",
   description: "",
   currency: "KRW",
   materialsBudget: "",
@@ -53,15 +67,40 @@ function canManage(role: string | null) {
   return role === "professor" || role === "admin";
 }
 
+function normalizeMerchantName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "TBD";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
+function dateInputValue(value: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
 function toFundingForm(source: FundingSource): FundingSourceForm {
   return {
     name: source.name ?? "",
+    fundingAgency: source.funding_agency ?? "",
+    projectCode: source.project_code ?? "",
+    projectTitle: source.project_title ?? "",
     description: source.description ?? "",
     currency: source.currency ?? "KRW",
     materialsBudget: String(source.materials_budget ?? ""),
     activitiesBudget: String(source.activities_budget ?? ""),
-    startDate: source.start_date ?? "",
-    endDate: source.end_date ?? "",
+    startDate: dateInputValue(source.start_date),
+    endDate: dateInputValue(source.end_date),
   };
 }
 
@@ -72,6 +111,9 @@ function parseBudget(value: string) {
 export default function AdminPage() {
   const [role, setRole] = useState<string | null>(null);
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
+  const [usedFundingSourceIds, setUsedFundingSourceIds] = useState<string[]>(
+    [],
+  );
   const [merchantReviews, setMerchantReviews] = useState<MerchantReview[]>([]);
   const [fundingForm, setFundingForm] =
     useState<FundingSourceForm>(emptyFundingForm);
@@ -88,21 +130,38 @@ export default function AdminPage() {
 
   const userCanManage = canManage(role);
 
-  const loadFundingSources = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("funding_sources")
-      .select(
-        "id, name, description, currency, materials_budget, activities_budget, start_date, end_date, is_active",
-      )
-      .order("name", { ascending: true });
+  const activeFundingSources = useMemo(
+    () => fundingSources.filter((source) => source.is_active !== false),
+    [fundingSources],
+  );
 
-    if (error) {
+  const inactiveFundingSources = useMemo(
+    () => fundingSources.filter((source) => source.is_active === false),
+    [fundingSources],
+  );
+
+  const loadFundingSources = useCallback(async () => {
+    const [sourcesResult, usageResult] = await Promise.all([
+      supabase
+        .from("funding_sources")
+        .select(
+          "id, name, funding_agency, project_code, project_title, description, currency, materials_budget, activities_budget, start_date, end_date, finished_at, is_active",
+        )
+        .order("name", { ascending: true }),
+      supabase
+        .from("purchase_requests")
+        .select("funding_source_id")
+        .eq("status", "paid")
+        .not("funding_source_id", "is", null),
+    ]);
+
+    if (sourcesResult.error) {
       setFundingSources([]);
-      setErrorMessage(error.message);
+      setErrorMessage(sourcesResult.error.message);
       return;
     }
 
-    const nextSources = (data ?? []) as FundingSource[];
+    const nextSources = (sourcesResult.data ?? []) as FundingSource[];
     setFundingSources(nextSources);
     setFundingDrafts(
       nextSources.reduce<Record<string, FundingSourceForm>>(
@@ -113,6 +172,13 @@ export default function AdminPage() {
         {},
       ),
     );
+
+    if (!usageResult.error) {
+      const usedIds = ((usageResult.data ?? []) as FundingUsage[])
+        .map((row) => row.funding_source_id)
+        .filter((id): id is string => Boolean(id));
+      setUsedFundingSourceIds(Array.from(new Set(usedIds)));
+    }
   }, []);
 
   const loadMerchantReviews = useCallback(async () => {
@@ -211,6 +277,9 @@ export default function AdminPage() {
 
   const getFundingPayload = (form: FundingSourceForm) => ({
     name: form.name.trim(),
+    funding_agency: form.fundingAgency.trim() || null,
+    project_code: form.projectCode.trim() || null,
+    project_title: form.projectTitle.trim() || null,
     description: form.description.trim() || null,
     currency: form.currency.trim() || "KRW",
     materials_budget: parseBudget(form.materialsBudget),
@@ -241,6 +310,7 @@ export default function AdminPage() {
     const { error } = await supabase.from("funding_sources").insert({
       ...payload,
       is_active: true,
+      finished_at: null,
     });
 
     if (error) {
@@ -290,17 +360,17 @@ export default function AdminPage() {
     await loadFundingSources();
   };
 
-  const handleToggleFundingSource = async (
-    sourceId: string,
-    nextActive: boolean,
-  ) => {
+  const handleFinishFundingSource = async (sourceId: string) => {
     setErrorMessage("");
     setSuccessMessage("");
     setSaving(true);
 
     const { error } = await supabase
       .from("funding_sources")
-      .update({ is_active: nextActive })
+      .update({
+        is_active: false,
+        finished_at: new Date().toISOString(),
+      })
       .eq("id", sourceId);
 
     if (error) {
@@ -309,9 +379,70 @@ export default function AdminPage() {
       return;
     }
 
-    setSuccessMessage(
-      nextActive ? "Funding source reactivated." : "Funding source deactivated.",
+    setSuccessMessage("Funding source marked as finished.");
+    setSaving(false);
+    await loadFundingSources();
+  };
+
+  const handleReactivateFundingSource = async (sourceId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("funding_sources")
+      .update({
+        is_active: true,
+        finished_at: null,
+      })
+      .eq("id", sourceId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Funding source reactivated.");
+    setSaving(false);
+    await loadFundingSources();
+  };
+
+  const handleDeleteFundingSource = async (sourceId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (usedFundingSourceIds.includes(sourceId)) {
+      setErrorMessage(
+        "This funding source is linked to payment records and should be finished instead of deleted.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this unused funding source? This cannot be undone.",
     );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("funding_sources")
+      .delete()
+      .eq("id", sourceId);
+
+    if (error) {
+      setErrorMessage(
+        "This funding source is linked to payment records and should be finished instead of deleted.",
+      );
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Unused funding source deleted.");
     setSaving(false);
     await loadFundingSources();
   };
@@ -327,20 +458,52 @@ export default function AdminPage() {
       return;
     }
 
+    const normalizedName = normalizeMerchantName(name);
+
+    if (!normalizedName) {
+      setErrorMessage("Merchant name must include at least one letter or number.");
+      return;
+    }
+
     setSaving(true);
 
-    const { error } = await supabase
+    const { data: existingMerchant, error: lookupError } = await supabase
       .from("merchants")
-      .update({ name })
-      .eq("id", merchantId);
+      .select("id")
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
 
-    if (error) {
-      setErrorMessage(error.message);
+    if (lookupError) {
+      setErrorMessage(lookupError.message);
       setSaving(false);
       return;
     }
 
-    setSuccessMessage("Merchant name updated.");
+    if (existingMerchant && (existingMerchant as { id: string }).id !== merchantId) {
+      setErrorMessage("A merchant with this normalized name already exists.");
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("merchants")
+      .update({
+        name,
+        normalized_name: normalizedName,
+      })
+      .eq("id", merchantId);
+
+    if (error) {
+      if (error.message.toLowerCase().includes("duplicate")) {
+        setErrorMessage("A merchant with this normalized name already exists.");
+      } else {
+        setErrorMessage(error.message);
+      }
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Merchant name and normalized name updated.");
     setSaving(false);
     await loadMerchantReviews();
   };
@@ -393,6 +556,22 @@ export default function AdminPage() {
     setSuccessMessage("Merchant deactivated.");
     setSaving(false);
     await loadMerchantReviews();
+  };
+
+  const renderFundingMetadata = (source: FundingSource) => {
+    const metadata = [
+      source.funding_agency ? `Agency: ${source.funding_agency}` : "",
+      source.project_code ? `Code: ${source.project_code}` : "",
+      source.project_title ? `Project: ${source.project_title}` : "",
+    ].filter(Boolean);
+
+    if (metadata.length === 0) {
+      return null;
+    }
+
+    return (
+      <p className="mt-2 text-xs leading-5 text-muted">{metadata.join(" / ")}</p>
+    );
   };
 
   return (
@@ -452,6 +631,30 @@ export default function AdminPage() {
                 onChange={(event) => updateFundingForm("name", event.target.value)}
                 className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand"
                 placeholder="Funding source name"
+              />
+              <input
+                value={fundingForm.fundingAgency}
+                onChange={(event) =>
+                  updateFundingForm("fundingAgency", event.target.value)
+                }
+                className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand"
+                placeholder="Funding agency"
+              />
+              <input
+                value={fundingForm.projectCode}
+                onChange={(event) =>
+                  updateFundingForm("projectCode", event.target.value)
+                }
+                className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand"
+                placeholder="Project code"
+              />
+              <input
+                value={fundingForm.projectTitle}
+                onChange={(event) =>
+                  updateFundingForm("projectTitle", event.target.value)
+                }
+                className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand"
+                placeholder="Project title"
               />
               <input
                 value={fundingForm.currency}
@@ -519,138 +722,257 @@ export default function AdminPage() {
             </form>
 
             <div className="mt-8 grid gap-4">
-              {fundingSources.length === 0 ? (
-                <div className="rounded-md border border-dashed border-line p-6 text-sm text-muted">
-                  No funding sources have been created yet.
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+                  Active Funding Sources
+                </p>
+                <div className="mt-4 grid gap-4">
+                  {activeFundingSources.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-line p-6 text-sm text-muted">
+                      No active funding sources.
+                    </div>
+                  ) : null}
+
+                  {activeFundingSources.map((source) => {
+                    const draft =
+                      fundingDrafts[source.id] ?? toFundingForm(source);
+
+                    return (
+                      <article
+                        key={source.id}
+                        className="rounded-md border border-line bg-white/75 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
+                              Active
+                            </p>
+                            <h4 className="mt-1 text-lg font-semibold">
+                              {source.name}
+                            </h4>
+                            {renderFundingMetadata(source)}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() =>
+                                void handleFinishFundingSource(source.id)
+                              }
+                              className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
+                            >
+                              Mark as Finished
+                            </button>
+                            {!usedFundingSourceIds.includes(source.id) ? (
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() =>
+                                  void handleDeleteFundingSource(source.id)
+                                }
+                                className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <input
+                            value={draft.name}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "name",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                          />
+                          <input
+                            value={draft.fundingAgency}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "fundingAgency",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                            placeholder="Funding agency"
+                          />
+                          <input
+                            value={draft.projectCode}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "projectCode",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                            placeholder="Project code"
+                          />
+                          <input
+                            value={draft.projectTitle}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "projectTitle",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                            placeholder="Project title"
+                          />
+                          <input
+                            value={draft.currency}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "currency",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm uppercase outline-none focus:border-brand"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={draft.materialsBudget}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "materialsBudget",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                            placeholder="Materials budget"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={draft.activitiesBudget}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "activitiesBudget",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                            placeholder="Activities budget"
+                          />
+                          <input
+                            type="date"
+                            value={draft.startDate}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "startDate",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                          />
+                          <input
+                            type="date"
+                            value={draft.endDate}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "endDate",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                          />
+                          <textarea
+                            value={draft.description}
+                            onChange={(event) =>
+                              updateFundingDraft(
+                                source.id,
+                                "description",
+                                event.target.value,
+                              )
+                            }
+                            className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand md:col-span-2"
+                          />
+                        </div>
+
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              void handleUpdateFundingSource(source.id)
+                            }
+                            className="rounded-md border border-brand/30 bg-brand-soft px-4 py-2 text-sm font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                          >
+                            Save Funding Source
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-              ) : null}
+              </div>
 
-              {fundingSources.map((source) => {
-                const draft = fundingDrafts[source.id] ?? toFundingForm(source);
-
-                return (
-                  <article
-                    key={source.id}
-                    className="rounded-md border border-line bg-white/75 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
-                        {source.is_active === false ? "Inactive" : "Active"}
-                      </p>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() =>
-                          void handleToggleFundingSource(
-                            source.id,
-                            source.is_active === false,
-                          )
-                        }
-                        className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
-                      >
-                        {source.is_active === false ? "Reactivate" : "Deactivate"}
-                      </button>
+              <div className="mt-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+                  Finished / Inactive Funding Sources
+                </p>
+                <div className="mt-4 grid gap-2">
+                  {inactiveFundingSources.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-line p-4 text-sm text-muted">
+                      No finished or inactive funding sources.
                     </div>
+                  ) : null}
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <input
-                        value={draft.name}
-                        onChange={(event) =>
-                          updateFundingDraft(source.id, "name", event.target.value)
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-                      />
-                      <input
-                        value={draft.currency}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "currency",
-                            event.target.value,
-                          )
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm uppercase outline-none focus:border-brand"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={draft.materialsBudget}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "materialsBudget",
-                            event.target.value,
-                          )
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-                        placeholder="Materials budget"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={draft.activitiesBudget}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "activitiesBudget",
-                            event.target.value,
-                          )
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-                        placeholder="Activities budget"
-                      />
-                      <input
-                        type="date"
-                        value={draft.startDate}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "startDate",
-                            event.target.value,
-                          )
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-                      />
-                      <input
-                        type="date"
-                        value={draft.endDate}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "endDate",
-                            event.target.value,
-                          )
-                        }
-                        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-                      />
-                      <textarea
-                        value={draft.description}
-                        onChange={(event) =>
-                          updateFundingDraft(
-                            source.id,
-                            "description",
-                            event.target.value,
-                          )
-                        }
-                        className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand md:col-span-2"
-                      />
+                  {inactiveFundingSources.map((source) => (
+                    <div
+                      key={source.id}
+                      className="grid gap-3 rounded-md border border-line bg-white/55 px-3 py-2 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{source.name}</p>
+                        {renderFundingMetadata(source)}
+                        <p className="mt-1 text-xs text-muted">
+                          Finished: {formatDate(source.finished_at)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() =>
+                            void handleReactivateFundingSource(source.id)
+                          }
+                          className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                        >
+                          Reactivate
+                        </button>
+                        {!usedFundingSourceIds.includes(source.id) ? (
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              void handleDeleteFundingSource(source.id)
+                            }
+                            className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void handleUpdateFundingSource(source.id)}
-                        className="rounded-md border border-brand/30 bg-brand-soft px-4 py-2 text-sm font-semibold text-brand transition hover:bg-white disabled:opacity-60"
-                      >
-                        Save Funding Source
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -674,62 +996,74 @@ export default function AdminPage() {
                 </div>
               ) : null}
 
-              {merchantReviews.map((merchant) => (
-                <article
-                  key={merchant.id}
-                  className="rounded-md border border-line bg-white/75 p-4"
-                >
-                  <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-                    <div>
-                      <input
-                        value={merchantDrafts[merchant.id] ?? merchant.name}
-                        onChange={(event) =>
-                          setMerchantDrafts((current) => ({
-                            ...current,
-                            [merchant.id]: event.target.value,
-                          }))
-                        }
-                        className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-brand"
-                      />
-                      <p className="mt-2 text-xs text-muted">
-                        Normalized: {merchant.normalized_name}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">
-                        Status:{" "}
-                        {merchant.is_active === false ? "inactive" : "active"}
-                      </p>
+              {merchantReviews.map((merchant) => {
+                const draftName = merchantDrafts[merchant.id] ?? merchant.name;
+                const normalizedPreview = normalizeMerchantName(draftName);
+
+                return (
+                  <article
+                    key={merchant.id}
+                    className="rounded-md border border-line bg-white/75 p-4"
+                  >
+                    <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+                      <div>
+                        <input
+                          value={draftName}
+                          onChange={(event) =>
+                            setMerchantDrafts((current) => ({
+                              ...current,
+                              [merchant.id]: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-brand"
+                        />
+                        <p className="mt-2 text-xs text-muted">
+                          Current normalized: {merchant.normalized_name}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          New normalized: {normalizedPreview || "TBD"}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          Status:{" "}
+                          {merchant.is_active === false ? "inactive" : "active"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() =>
+                            void handleSaveMerchantName(merchant.id)
+                          }
+                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
+                        >
+                          Save Name
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() =>
+                            void handleMarkMerchantReviewed(merchant.id)
+                          }
+                          className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                        >
+                          Mark Reviewed
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving || merchant.is_active === false}
+                          onClick={() =>
+                            void handleDeactivateMerchant(merchant.id)
+                          }
+                          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                        >
+                          Deactivate
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 lg:justify-end">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void handleSaveMerchantName(merchant.id)}
-                        className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
-                      >
-                        Save Name
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() =>
-                          void handleMarkMerchantReviewed(merchant.id)
-                        }
-                        className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
-                      >
-                        Mark Reviewed
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving || merchant.is_active === false}
-                        onClick={() => void handleDeactivateMerchant(merchant.id)}
-                        className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
-                      >
-                        Deactivate
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </div>

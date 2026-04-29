@@ -464,16 +464,17 @@ export function PurchaseRequestPanel() {
     [merchantMap, requests],
   );
 
-  const canceledRequests = requests.filter(
-    (request) => request.status === "canceled",
-  );
-
   const handleCancelRequest = async (request: PurchaseRequest) => {
     setSubmitError("");
     setSuccessMessage("");
 
+    if (request.status !== "pending_payment") {
+      setSubmitError("Only pending payment requests can be canceled.");
+      return;
+    }
+
     const confirmed = window.confirm(
-      `Cancel "${request.item_name}"? This keeps the row but removes it from pending payment totals.`,
+      `Delete pending request "${request.item_name}"? This cannot be undone.`,
     );
 
     if (!confirmed) {
@@ -484,7 +485,7 @@ export function PurchaseRequestPanel() {
 
     const { error } = await supabase
       .from("purchase_requests")
-      .update({ status: "canceled" })
+      .delete()
       .eq("id", request.id);
 
     if (error) {
@@ -493,7 +494,7 @@ export function PurchaseRequestPanel() {
       return;
     }
 
-    setSuccessMessage("Purchase request canceled.");
+    setSuccessMessage("Pending purchase request deleted.");
     setCancelingRequestId(null);
     await loadRequests();
   };
@@ -826,7 +827,10 @@ export function PurchaseRequestPanel() {
           </div>
         ) : null}
 
-        {!requestsLoading && !requestsError && requests.length === 0 ? (
+        {!requestsLoading &&
+        !requestsError &&
+        pendingGroups.length === 0 &&
+        paidGroups.length === 0 ? (
           <div className="portal-card mt-6 rounded-md border border-dashed border-line p-8 text-center text-sm text-muted">
             No purchase requests yet.
           </div>
@@ -872,7 +876,7 @@ export function PurchaseRequestPanel() {
                             {request.item_name}
                           </p>
                           <p className="mt-0.5 text-xs text-muted">
-                            {formatDate(request.requested_at)} ·{" "}
+                            {formatDate(request.requested_at)} -{" "}
                             {formatStatus(request.status)}
                           </p>
                         </div>
@@ -905,7 +909,7 @@ export function PurchaseRequestPanel() {
                             className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {cancelingRequestId === request.id
-                              ? "Canceling..."
+                              ? "Deleting..."
                               : "Cancel Request"}
                           </button>
                         </div>
@@ -988,33 +992,6 @@ export function PurchaseRequestPanel() {
           </section>
         ) : null}
 
-        {!requestsLoading && !requestsError && canceledRequests.length > 0 ? (
-          <section className="mt-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
-              Canceled Requests
-            </p>
-            <div className="mt-4 grid gap-2">
-              {canceledRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="grid gap-2 rounded-md border border-line bg-white/45 px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto] lg:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground/70">
-                      {request.item_name}
-                    </p>
-                    <p className="mt-0.5">
-                      {getRequestMerchantName(request)} ·{" "}
-                      {formatDate(request.requested_at)}
-                    </p>
-                  </div>
-                  <p>{formatCost(request.estimated_cost, request.currency)}</p>
-                  <p className="capitalize">{formatStatus(request.status)}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </section>
     </div>
   );

@@ -350,7 +350,7 @@ export default function PaymentTrackerPage() {
   const paidGroups = useMemo(
     () =>
       groupRequestsByMerchant(
-        requests.filter((request) => request.status !== "pending_payment"),
+        requests.filter((request) => request.status === "paid"),
         merchantMap,
       ),
     [merchantMap, requests],
