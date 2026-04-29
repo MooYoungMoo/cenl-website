@@ -7,7 +7,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-[1.3fr_0.8fr_1fr]">
         <div className="space-y-4">
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand">
-            {siteMeta.name}
+            ChemoElectronic Nanomaterials Lab · CENL
           </p>
           <p className="max-w-md text-sm leading-7 text-muted">
             Advancing chemoelectronic nanomaterials, sensor platforms, and
