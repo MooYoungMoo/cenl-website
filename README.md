@@ -45,6 +45,11 @@ Frontend-only Next.js project for a modern academic research lab website.
 
 3. Open `http://localhost:3000`
 
+## Environment Variables
+
+Create a local `.env.local` file using `.env.local.example` as a template.
+Do not commit real Supabase keys or service role keys.
+
 ## Notes
 
 - This project currently includes frontend structure and UI only.
