@@ -3,6 +3,7 @@ import { Geist, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { buildSiteMetadata, fallbackSiteSettings } from "@/lib/site-settings";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -17,11 +18,7 @@ const notoSansKr = Noto_Sans_KR({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "ChemoElectronic Nanomaterials Lab (CENL)",
-  description:
-    "Chemoelectronic nanomaterials, electronic nose systems, and chemical sensing research.",
-};
+export const metadata: Metadata = buildSiteMetadata(fallbackSiteSettings);
 
 export default function RootLayout({
   children,

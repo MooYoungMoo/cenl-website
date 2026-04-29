@@ -10,6 +10,7 @@ import {
   Microscope,
   Newspaper,
   ScrollText,
+  Settings,
   ShieldCheck,
   Sparkles,
   UserRound,
@@ -720,6 +721,12 @@ export const portalNavigationSections: PortalNavigationSection[] = [
     title: "Website Management",
     description: "Manage public website content without editing code.",
     links: [
+      {
+        href: "/portal/site-settings",
+        label: "Site Settings",
+        description: "Manage global labels, footer text, logo, and SEO defaults.",
+        icon: Settings,
+      },
       {
         href: "/portal/home",
         label: "Home",
