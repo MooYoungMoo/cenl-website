@@ -42,6 +42,7 @@ type MerchantReview = {
   id: string;
   name: string;
   normalized_name: string;
+  note: string | null;
   needs_review: boolean | null;
   is_active: boolean | null;
 };
@@ -128,6 +129,10 @@ export default function AdminPage() {
   const [merchantDrafts, setMerchantDrafts] = useState<Record<string, string>>(
     {},
   );
+  const [mergeSourceSearch, setMergeSourceSearch] = useState("");
+  const [mergeTargetSearch, setMergeTargetSearch] = useState("");
+  const [mergeSourceMerchantId, setMergeSourceMerchantId] = useState("");
+  const [mergeTargetMerchantId, setMergeTargetMerchantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -165,6 +170,47 @@ export default function AdminPage() {
     () => merchantReviews.filter((merchant) => merchant.is_active === false),
     [merchantReviews],
   );
+
+  const mergeSourceMerchant = useMemo(
+    () =>
+      merchantReviews.find((merchant) => merchant.id === mergeSourceMerchantId) ??
+      null,
+    [mergeSourceMerchantId, merchantReviews],
+  );
+
+  const mergeTargetMerchant = useMemo(
+    () =>
+      merchantReviews.find((merchant) => merchant.id === mergeTargetMerchantId) ??
+      null,
+    [mergeTargetMerchantId, merchantReviews],
+  );
+
+  const sourceMerchantOptions = useMemo(() => {
+    const search = mergeSourceSearch.trim().toLowerCase();
+
+    return merchantReviews
+      .filter((merchant) =>
+        search
+          ? merchant.name.toLowerCase().includes(search) ||
+            merchant.normalized_name.includes(normalizeMerchantName(search))
+          : true,
+      )
+      .slice(0, 12);
+  }, [mergeSourceSearch, merchantReviews]);
+
+  const targetMerchantOptions = useMemo(() => {
+    const search = mergeTargetSearch.trim().toLowerCase();
+
+    return merchantReviews
+      .filter((merchant) => merchant.is_active !== false)
+      .filter((merchant) =>
+        search
+          ? merchant.name.toLowerCase().includes(search) ||
+            merchant.normalized_name.includes(normalizeMerchantName(search))
+          : true,
+      )
+      .slice(0, 12);
+  }, [mergeTargetSearch, merchantReviews]);
 
   const loadFundingSources = useCallback(async () => {
     const [sourcesResult, usageResult] = await Promise.all([
@@ -211,7 +257,7 @@ export default function AdminPage() {
     const [merchantsResult, usageResult] = await Promise.all([
       supabase
         .from("merchants")
-        .select("id, name, normalized_name, needs_review, is_active")
+        .select("id, name, normalized_name, note, needs_review, is_active")
         .order("is_active", { ascending: false })
         .order("name", { ascending: true }),
       supabase
@@ -653,6 +699,80 @@ export default function AdminPage() {
     }
 
     setSuccessMessage("Inactive unused merchant deleted.");
+    setSaving(false);
+    await loadMerchantReviews();
+  };
+
+  const handleMergeMerchants = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!mergeSourceMerchant || !mergeTargetMerchant) {
+      setErrorMessage("Select both a source merchant and a target merchant.");
+      return;
+    }
+
+    if (mergeSourceMerchant.id === mergeTargetMerchant.id) {
+      setErrorMessage("Source merchant and target merchant cannot be the same.");
+      return;
+    }
+
+    if (mergeTargetMerchant.is_active === false) {
+      setErrorMessage("Target merchant must be active before merging.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `This will move all purchase requests from ${mergeSourceMerchant.name} to ${mergeTargetMerchant.name}. This cannot be automatically undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error: requestError } = await supabase
+      .from("purchase_requests")
+      .update({
+        merchant_id: mergeTargetMerchant.id,
+        merchant: mergeTargetMerchant.name,
+      })
+      .eq("merchant_id", mergeSourceMerchant.id);
+
+    if (requestError) {
+      setErrorMessage(requestError.message);
+      setSaving(false);
+      return;
+    }
+
+    const mergeMessage = `Merged into ${mergeTargetMerchant.name}`;
+    const nextNote = mergeSourceMerchant.note
+      ? `${mergeSourceMerchant.note}\n${mergeMessage}`
+      : mergeMessage;
+
+    const { error: sourceError } = await supabase
+      .from("merchants")
+      .update({
+        is_active: false,
+        needs_review: false,
+        note: nextNote,
+      })
+      .eq("id", mergeSourceMerchant.id);
+
+    if (sourceError) {
+      setErrorMessage(sourceError.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage(
+      `${mergeSourceMerchant.name} was merged into ${mergeTargetMerchant.name}.`,
+    );
+    setMergeSourceMerchantId("");
+    setMergeTargetMerchantId("");
+    setMergeSourceSearch("");
+    setMergeTargetSearch("");
     setSaving(false);
     await loadMerchantReviews();
   };
@@ -1191,6 +1311,113 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+              Merge Merchants
+            </p>
+            <h3 className="mt-3 text-2xl font-semibold">
+              Move duplicate merchant history
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              Merge a typo or duplicate merchant into an existing active
+              merchant. Purchase requests move to the target merchant, while
+              the source merchant remains inactive for history.
+            </p>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  Source merchant
+                </span>
+                <input
+                  value={mergeSourceSearch}
+                  onChange={(event) => setMergeSourceSearch(event.target.value)}
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                  placeholder="Search source merchant"
+                />
+                <select
+                  value={mergeSourceMerchantId}
+                  onChange={(event) =>
+                    setMergeSourceMerchantId(event.target.value)
+                  }
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                >
+                  <option value="">Select source merchant</option>
+                  {sourceMerchantOptions.map((merchant) => (
+                    <option key={merchant.id} value={merchant.id}>
+                      {merchant.name}
+                      {merchant.is_active === false ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  Target merchant
+                </span>
+                <input
+                  value={mergeTargetSearch}
+                  onChange={(event) => setMergeTargetSearch(event.target.value)}
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                  placeholder="Search active target merchant"
+                />
+                <select
+                  value={mergeTargetMerchantId}
+                  onChange={(event) =>
+                    setMergeTargetMerchantId(event.target.value)
+                  }
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                >
+                  <option value="">Select active target merchant</option>
+                  {targetMerchantOptions.map((merchant) => (
+                    <option key={merchant.id} value={merchant.id}>
+                      {merchant.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleMergeMerchants()}
+                className="rounded-md border border-brand/30 bg-brand-soft px-4 py-2.5 text-sm font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+              >
+                Merge Merchant
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-2 rounded-md border border-line bg-white/60 p-3 text-sm md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                  Source
+                </p>
+                <p className="mt-1 font-semibold">
+                  {mergeSourceMerchant?.name ?? "Not selected"}
+                </p>
+                {mergeSourceMerchant ? (
+                  <p className="mt-1 text-xs text-muted">
+                    normalized: {mergeSourceMerchant.normalized_name}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                  Target
+                </p>
+                <p className="mt-1 font-semibold">
+                  {mergeTargetMerchant?.name ?? "Not selected"}
+                </p>
+                {mergeTargetMerchant ? (
+                  <p className="mt-1 text-xs text-muted">
+                    normalized: {mergeTargetMerchant.normalized_name}
+                  </p>
+                ) : null}
               </div>
             </div>
           </section>
