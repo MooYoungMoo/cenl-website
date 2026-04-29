@@ -21,6 +21,11 @@ type Merchant = {
   updated_at: string | null;
 };
 
+type FundingSource = {
+  id: string;
+  name: string;
+};
+
 type PurchaseRequest = {
   id: string;
   requester_id: string;
@@ -39,6 +44,13 @@ type PurchaseRequest = {
   paid_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+type MerchantGroup = {
+  key: string;
+  merchantName: string;
+  needsReview: boolean;
+  requests: PurchaseRequest[];
 };
 
 type PurchaseRequestForm = {
@@ -66,6 +78,8 @@ const merchantSelect =
 
 const requestSelect =
   "id, requester_id, merchant, merchant_id, item_name, cost_category, item_url, purpose, estimated_cost, currency, status, payment_note, funding_source_id, requested_at, paid_at, created_at, updated_at";
+
+const fundingSourceSelect = "id, name";
 
 function normalizeMerchantName(value: string) {
   return value
@@ -97,6 +111,19 @@ function formatStatus(status: string) {
   return status.replaceAll("_", " ");
 }
 
+function formatGroupTotal(requests: PurchaseRequest[]) {
+  const totals = requests.reduce<Record<string, number>>((accumulator, request) => {
+    const currency = request.currency || "KRW";
+    accumulator[currency] =
+      (accumulator[currency] ?? 0) + (request.estimated_cost ?? 0);
+    return accumulator;
+  }, {});
+
+  return Object.entries(totals)
+    .map(([currency, total]) => `${total.toLocaleString()} ${currency}`)
+    .join(" / ");
+}
+
 function FieldLabel({
   children,
   required = false,
@@ -121,6 +148,7 @@ export function PurchaseRequestPanel() {
   const [merchantDropdownOpen, setMerchantDropdownOpen] = useState(false);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
+  const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [merchantsLoading, setMerchantsLoading] = useState(true);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -129,6 +157,21 @@ export function PurchaseRequestPanel() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [addingMerchant, setAddingMerchant] = useState(false);
+  const [cancelingRequestId, setCancelingRequestId] = useState<string | null>(
+    null,
+  );
+
+  const fundingSourceMap = useMemo(
+    () =>
+      fundingSources.reduce<Record<string, FundingSource>>(
+        (accumulator, source) => {
+          accumulator[source.id] = source;
+          return accumulator;
+        },
+        {},
+      ),
+    [fundingSources],
+  );
 
   const loadMerchants = useCallback(async () => {
     setMerchantsLoading(true);
@@ -155,6 +198,15 @@ export function PurchaseRequestPanel() {
     }
 
     setMerchantsLoading(false);
+  }, []);
+
+  const loadFundingSources = useCallback(async () => {
+    const { data } = await supabase
+      .from("funding_sources")
+      .select(fundingSourceSelect)
+      .order("name", { ascending: true });
+
+    setFundingSources((data ?? []) as FundingSource[]);
   }, []);
 
   const loadRequestMerchants = useCallback(async (requestRows: PurchaseRequest[]) => {
@@ -210,13 +262,14 @@ export function PurchaseRequestPanel() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadMerchants();
+      void loadFundingSources();
       void loadRequests();
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [loadMerchants, loadRequests]);
+  }, [loadFundingSources, loadMerchants, loadRequests]);
 
   const filteredMerchants = useMemo(() => {
     const search = merchantSearch.trim().toLowerCase();
@@ -357,6 +410,92 @@ export function PurchaseRequestPanel() {
     }
 
     return request.merchant || "Unknown merchant";
+  };
+
+  const getRequestMerchantNeedsReview = (request: PurchaseRequest) => {
+    if (!request.merchant_id) {
+      return false;
+    }
+
+    return Boolean(merchantMap[request.merchant_id]?.needs_review);
+  };
+
+  const createMerchantGroups = (items: PurchaseRequest[]) => {
+    const grouped = items.reduce<Record<string, MerchantGroup>>(
+      (accumulator, request) => {
+        const merchantName = getRequestMerchantName(request);
+        const fallbackKey = normalizeMerchantName(merchantName) || "unknown";
+        const key = request.merchant_id
+          ? `merchant:${request.merchant_id}`
+          : `text:${fallbackKey}`;
+
+        accumulator[key] ??= {
+          key,
+          merchantName,
+          needsReview: getRequestMerchantNeedsReview(request),
+          requests: [],
+        };
+        accumulator[key].requests.push(request);
+        return accumulator;
+      },
+      {},
+    );
+
+    return Object.values(grouped);
+  };
+
+  const pendingGroups = useMemo(
+    () =>
+      createMerchantGroups(
+        requests.filter((request) => request.status === "pending_payment"),
+      ),
+    // createMerchantGroups intentionally depends on merchantMap through helpers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [merchantMap, requests],
+  );
+
+  const paidGroups = useMemo(
+    () =>
+      createMerchantGroups(
+        requests.filter((request) => request.status === "paid"),
+      ),
+    // createMerchantGroups intentionally depends on merchantMap through helpers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [merchantMap, requests],
+  );
+
+  const canceledRequests = requests.filter(
+    (request) => request.status === "canceled",
+  );
+
+  const handleCancelRequest = async (request: PurchaseRequest) => {
+    setSubmitError("");
+    setSuccessMessage("");
+
+    const confirmed = window.confirm(
+      `Cancel "${request.item_name}"? This keeps the row but removes it from pending payment totals.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancelingRequestId(request.id);
+
+    const { error } = await supabase
+      .from("purchase_requests")
+      .update({ status: "canceled" })
+      .eq("id", request.id);
+
+    if (error) {
+      setSubmitError(error.message);
+      setCancelingRequestId(null);
+      return;
+    }
+
+    setSuccessMessage("Purchase request canceled.");
+    setCancelingRequestId(null);
+    await loadRequests();
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -693,83 +832,188 @@ export function PurchaseRequestPanel() {
           </div>
         ) : null}
 
-        {!requestsLoading && !requestsError && requests.length > 0 ? (
+        {!requestsLoading && !requestsError && pendingGroups.length > 0 ? (
           <div className="mt-6 grid gap-4">
-            {requests.map((request) => (
+            {pendingGroups.map((group) => (
               <article
-                key={request.id}
-                className="elevated-card portal-card border border-line p-5"
+                key={group.key}
+                className="elevated-card portal-card border border-line p-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
-                      {formatStatus(request.status)}
-                    </p>
-                    <h4 className="mt-2 text-xl font-semibold">
-                      {request.item_name}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+                        Pending
+                      </p>
+                      {group.needsReview ? (
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
+                          Needs review
+                        </span>
+                      ) : null}
+                    </div>
+                    <h4 className="mt-1 text-xl font-semibold">
+                      {group.merchantName}
                     </h4>
-                    <p className="mt-1 text-sm text-muted">
-                      {getRequestMerchantName(request)}
-                    </p>
                   </div>
-                  <p className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-muted shadow-sm">
-                    {formatDate(request.requested_at)}
+                  <p className="rounded-md bg-brand-soft px-3 py-2 text-sm font-semibold text-brand">
+                    {formatGroupTotal(group.requests)}
                   </p>
                 </div>
 
-                <dl className="mt-5 grid gap-4 text-sm md:grid-cols-3">
-                  <div>
-                    <dt className="font-semibold text-foreground">Category</dt>
-                    <dd className="mt-1 capitalize text-muted">
-                      {request.cost_category || "Not specified"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-foreground">Amount</dt>
-                    <dd className="mt-1 text-muted">
-                      {formatCost(request.estimated_cost, request.currency)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-foreground">Paid date</dt>
-                    <dd className="mt-1 text-muted">
-                      {formatDate(request.paid_at)}
-                    </dd>
-                  </div>
-                </dl>
+                <div className="mt-3 grid gap-2">
+                  {group.requests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="rounded-md border border-line/70 bg-white/80 p-3 text-sm"
+                    >
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_auto] lg:items-start">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">
+                            {request.item_name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {formatDate(request.requested_at)} ·{" "}
+                            {formatStatus(request.status)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-md bg-brand-soft px-2 py-1 font-semibold capitalize text-brand">
+                            {request.cost_category || "uncategorized"}
+                          </span>
+                          <span className="rounded-md bg-white px-2 py-1 font-semibold text-muted">
+                            {formatCost(
+                              request.estimated_cost,
+                              request.currency,
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 lg:justify-end">
+                          {request.item_url ? (
+                            <a
+                              href={request.item_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-brand transition hover:text-foreground"
+                            >
+                              Item URL
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={cancelingRequestId === request.id}
+                            onClick={() => void handleCancelRequest(request)}
+                            className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {cancelingRequestId === request.id
+                              ? "Canceling..."
+                              : "Cancel Request"}
+                          </button>
+                        </div>
+                      </div>
 
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-md border border-line/70 bg-white/70 p-4">
-                    <p className="text-sm font-semibold text-foreground">
-                      Purpose
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-muted">
-                      {request.purpose}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-line/70 bg-white/70 p-4">
-                    <p className="text-sm font-semibold text-foreground">
-                      Comment / payment note
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-muted">
-                      {request.payment_note || "No note provided."}
-                    </p>
-                  </div>
+                      <div className="mt-2 grid gap-1 text-xs leading-5 text-muted lg:grid-cols-2">
+                        <p>
+                          <span className="font-semibold text-foreground">
+                            Purpose:
+                          </span>{" "}
+                          {request.purpose}
+                        </p>
+                        {request.payment_note ? (
+                          <p>
+                            <span className="font-semibold text-foreground">
+                              Note:
+                            </span>{" "}
+                            {request.payment_note}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                {request.item_url ? (
-                  <a
-                    href={request.item_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex text-sm font-semibold text-brand transition hover:text-foreground"
-                  >
-                    View item URL
-                  </a>
-                ) : null}
               </article>
             ))}
           </div>
+        ) : null}
+
+        {!requestsLoading && !requestsError && paidGroups.length > 0 ? (
+          <section className="mt-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+              Paid Requests
+            </p>
+            <div className="mt-4 grid gap-3">
+              {paidGroups.map((group) => (
+                <article
+                  key={group.key}
+                  className="rounded-md border border-line bg-white/65 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="font-semibold">{group.merchantName}</h4>
+                      {group.needsReview ? (
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
+                          Needs review
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm font-semibold text-muted">
+                      {formatGroupTotal(group.requests)}
+                    </p>
+                  </div>
+
+                  <div className="mt-2 grid gap-2">
+                    {group.requests.map((request) => (
+                      <div
+                        key={request.id}
+                        className="grid gap-2 rounded-md bg-[#f7f9fb] px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
+                      >
+                        <p className="truncate font-semibold text-foreground">
+                          {request.item_name}
+                        </p>
+                        <p className="font-semibold">
+                          {formatCost(request.estimated_cost, request.currency)}
+                        </p>
+                        <p>
+                          {request.funding_source_id
+                            ? fundingSourceMap[request.funding_source_id]
+                                ?.name ?? "Funding source assigned"
+                            : "No funding source"}
+                        </p>
+                        <p>{formatDate(request.paid_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!requestsLoading && !requestsError && canceledRequests.length > 0 ? (
+          <section className="mt-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+              Canceled Requests
+            </p>
+            <div className="mt-4 grid gap-2">
+              {canceledRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="grid gap-2 rounded-md border border-line bg-white/45 px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto] lg:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-foreground/70">
+                      {request.item_name}
+                    </p>
+                    <p className="mt-0.5">
+                      {getRequestMerchantName(request)} ·{" "}
+                      {formatDate(request.requested_at)}
+                    </p>
+                  </div>
+                  <p>{formatCost(request.estimated_cost, request.currency)}</p>
+                  <p className="capitalize">{formatStatus(request.status)}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
       </section>
     </div>
