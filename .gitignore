@@ -1,0 +1,11 @@
+.next
+node_modules
+.pnpm-store
+.tools
+.next-dev*.log
+.next-dev.pid
+tsconfig.tsbuildinfo
+out
+dist
+.DS_Store
+*.log
