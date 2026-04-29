@@ -644,14 +644,11 @@ export const newsItems: NewsItem[] = [
 
 export const contactDetails = {
   lab: "ChemoElectronic Nanomaterials Lab",
-  pi: "Young-Moo Jo, Ph.D.",
-  position: "Assistant Professor",
-  affiliation: [
-    "School of Materials Science & Engineering",
-    "Kyungpook National University",
-  ],
-  emails: ["jym754@knu.ac.kr", "jym754@gmail.com"],
+  contactPerson: "TBD",
+  role: "Lab manager / student contact, TBD",
+  emails: ["TBD"],
   address: "TBD",
+  note: "This section should be easy to update later through a future Admin page.",
 };
 
 export const recruitingInformation = {
@@ -792,11 +789,11 @@ export const contactHighlights: ContactCard[] = [
     description: "",
     fields: [
       { label: "Lab", values: [contactDetails.lab] },
-      { label: "PI", values: [contactDetails.pi] },
-      { label: "Position", values: [contactDetails.position] },
-      { label: "Affiliation", values: contactDetails.affiliation },
+      { label: "Contact person", values: [contactDetails.contactPerson] },
+      { label: "Role", values: [contactDetails.role] },
       { label: "Email", values: contactDetails.emails, type: "email" },
       { label: "Address", values: [contactDetails.address] },
+      { label: "Note", values: [contactDetails.note] },
     ],
   },
 ];

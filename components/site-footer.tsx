@@ -32,15 +32,9 @@ export function SiteFooter() {
           </p>
           <div className="grid gap-1 text-sm leading-7 text-muted">
             <p>{contactDetails.lab}</p>
-            <p>{contactDetails.pi}</p>
-            <p>{contactDetails.affiliation[0]}</p>
-            <p>{contactDetails.affiliation[1]}</p>
-            <a
-              href={`mailto:${contactDetails.emails[0]}`}
-              className="hover:text-brand"
-            >
-              {contactDetails.emails[0]}
-            </a>
+            <p>Contact person: {contactDetails.contactPerson}</p>
+            <p>Role: {contactDetails.role}</p>
+            <p>Email: {contactDetails.emails[0]}</p>
           </div>
         </div>
       </div>

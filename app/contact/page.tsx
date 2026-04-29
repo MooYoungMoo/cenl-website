@@ -34,7 +34,7 @@ export default function ContactPage() {
                       </p>
                       <div className="mt-2 space-y-2 text-sm leading-7 text-muted">
                         {field.values.map((value) =>
-                          field.type === "email" ? (
+                          field.type === "email" && value !== "TBD" ? (
                             <a
                               key={value}
                               href={`mailto:${value}`}
