@@ -724,6 +724,12 @@ export const portalLinks: PortalLink[] = [
     icon: Microscope,
   },
   {
+    href: "/portal/contact",
+    label: "Contact",
+    description: "Manage recruiting and lab contact page content.",
+    icon: Mail,
+  },
+  {
     href: "/portal/admin",
     label: "Admin",
     description: "Manage merchants, Funding Sources, and portal operations.",
