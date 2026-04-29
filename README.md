@@ -50,6 +50,10 @@ Frontend-only Next.js project for a modern academic research lab website.
 Create a local `.env.local` file using `.env.local.example` as a template.
 Do not commit real Supabase keys or service role keys.
 
+To test Lab Portal login locally, create a Supabase Auth user in your Supabase
+project, add the public project URL and anon key to `.env.local`, then run
+`npm run dev` and sign in at `/portal/login`.
+
 ## Notes
 
 - This project currently includes frontend structure and UI only.
