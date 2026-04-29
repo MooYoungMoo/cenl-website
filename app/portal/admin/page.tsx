@@ -5,15 +5,15 @@ export default function AdminPage() {
   return (
     <PortalShell
       title="Admin"
-      description="Private-looking administration page for future portal configuration."
+      description="Private-looking administration page for future lab content and portal configuration."
     >
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Admin
       </p>
       <h2 className="mt-4 text-3xl font-semibold">Portal administration placeholder</h2>
       <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
-        This page is only a UI scaffold. It does not manage real users,
-        permissions, budgets, or records yet.
+        This page is only a UI scaffold. Future admin tools can manage funding
+        sources, members, publications, news, and portal settings from here.
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {adminItems.map((item) => (

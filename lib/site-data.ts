@@ -105,12 +105,6 @@ export type PortalDashboardCard = {
   value: string;
 };
 
-export type ApprovalRecord = {
-  title: string;
-  status: string;
-  date: string;
-};
-
 export type AdminPlaceholderItem = {
   label: string;
 };
@@ -676,7 +670,7 @@ export const portalLinks: PortalLink[] = [
   {
     href: "/portal/purchase-request",
     label: "Purchase Request",
-    description: "Prepare internal purchase request drafts for PI or admin review.",
+    description: "Submit merchant-based requests for pending payment tracking.",
     icon: ClipboardList,
   },
   {
@@ -687,8 +681,8 @@ export const portalLinks: PortalLink[] = [
   },
   {
     href: "/portal/approval-history",
-    label: "Approval History",
-    description: "Track placeholder approval status and internal review history.",
+    label: "Payment Tracker",
+    description: "Group pending merchant requests and record paid expenses.",
     icon: FolderKanban,
   },
   {
@@ -713,16 +707,10 @@ export const purchaseRequestFields: string[] = [
 ];
 
 export const budgetDashboardCards: PortalDashboardCard[] = [
-  { label: "Active Grants", value: "3" },
-  { label: "Planned Requests", value: "12" },
-  { label: "Pending Review", value: "5" },
+  { label: "Funding Sources", value: "3" },
+  { label: "Pending Payments", value: "12" },
+  { label: "Paid Requests", value: "5" },
   { label: "Receipt Queue", value: "8" },
-];
-
-export const approvalRecords: ApprovalRecord[] = [
-  { title: "Gas sensor materials order", status: "Approved", date: "2026-04-14" },
-  { title: "Conference registration", status: "Pending", date: "2026-04-11" },
-  { title: "Prototype enclosure fabrication", status: "Returned", date: "2026-04-05" },
 ];
 
 export const receiptItems: string[] = [
@@ -733,10 +721,10 @@ export const receiptItems: string[] = [
 ];
 
 export const adminItems: AdminPlaceholderItem[] = [
-  { label: "Member role placeholders" },
-  { label: "Budget category placeholders" },
-  { label: "Portal announcement placeholders" },
-  { label: "Request review settings" },
+  { label: "Funding source management placeholder" },
+  { label: "Member and role management placeholder" },
+  { label: "Publication and news management placeholder" },
+  { label: "Portal settings placeholder" },
 ];
 
 export const quickStats: StatItem[] = [

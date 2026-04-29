@@ -5,7 +5,7 @@ export default function PurchaseRequestPage() {
   return (
     <PortalShell
       title="Purchase Request"
-      description="Submit purchase requests and review request status through the lab portal."
+      description="Submit merchant-based requests for later payment tracking."
     >
       <PurchaseRequestPanel />
     </PortalShell>
