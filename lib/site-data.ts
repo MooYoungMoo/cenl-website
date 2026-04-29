@@ -43,18 +43,22 @@ export type IconLink = {
 export type TimelineEntry = {
   period: string;
   title: string;
-  description: string;
+  location?: string;
+  description?: string;
+  advisors?: string[];
+  details?: string[];
 };
 
 export type PiProfile = {
   name: string;
-  title: string;
-  degree: string;
-  email: string;
-  biography: string;
+  position: string;
+  affiliation: string[];
+  emails: string[];
+  externalProfiles: string[];
+  summary: string;
   educationCareer: TimelineEntry[];
-  professionalExperiences: string[];
-  awardsHonors: string[];
+  professionalExperiences: TimelineEntry[];
+  awardsHonors: TimelineEntry[];
 };
 
 export type LabMember = {
@@ -188,38 +192,137 @@ export const researchTopics: ResearchTopic[] = [
 ];
 
 export const piProfile: PiProfile = {
-  name: "Prof. CENL Principal Investigator",
-  title: "Principal Investigator",
-  degree: "Ph.D. in Materials Science and Engineering",
-  email: "pi.cenl@example.edu",
-  biography:
-    "The principal investigator leads CENL's research on chemoelectronic nanomaterials, sensor systems, and intelligent chemical analysis. This placeholder profile can be replaced with the PI's official biography, education, awards, and selected publications.",
+  name: "Young-Moo Jo, Ph.D.",
+  position: "Assistant Professor",
+  affiliation: [
+    "School of Materials Science & Engineering",
+    "Kyungpook National University",
+  ],
+  emails: ["jym754@knu.ac.kr", "jym754@gmail.com"],
+  externalProfiles: ["Google Scholar", "ORCID", "LinkedIn"],
+  summary:
+    "Assistant Professor, School of Materials Science & Engineering, Kyungpook National University",
   educationCareer: [
     {
-      period: "2024-Present",
-      title: "Principal Investigator, ChemoElectronic Nanomaterials Lab",
-      description: "Leading research programs in nanomaterial-based chemical sensing and electronic nose systems.",
+      period: "Mar. 1, 2025 – present",
+      title: "Assistant Professor, Kyungpook National University",
+      location: "Daegu, South Korea",
     },
     {
-      period: "2021-2024",
-      title: "Faculty Appointment Placeholder",
-      description: "Developed independent research directions in chemoelectronic materials and sensor interfaces.",
+      period: "Jul. 1, 2022 – Feb. 15, 2025",
+      title: "Postdoctoral Associate, Massachusetts Institute of Technology",
+      location: "Cambridge, USA",
+      advisors: ["Prof. Mircea Dinca"],
     },
     {
-      period: "2016-2021",
-      title: "Ph.D. in Materials Science and Engineering",
-      description: "Placeholder education entry for official degree, institution, and dissertation details.",
+      period: "Mar. 1, 2022 – Feb. 28, 2023",
+      title: "BK21 Research Professor, Korea University",
+      location: "Seoul, Korea",
+    },
+    {
+      period: "Mar. 2016 – Feb. 2022",
+      title: "M.S./Ph.D., Materials Science and Engineering, Korea University",
+      location: "Seoul, Korea",
+      advisors: ["Prof. Jong-Heun Lee"],
+    },
+    {
+      period: "Mar. 2010 – Feb. 2016",
+      title: "B.S., Materials Science and Engineering, Korea University",
+      location: "Seoul, Korea",
     },
   ],
   professionalExperiences: [
-    "Editorial board, chemical sensing journal placeholder",
-    "Program committee, nanomaterials and devices conference placeholder",
-    "Industry collaboration lead for portable chemical monitoring platform placeholder",
+    {
+      period: "Dec. 2025 – present",
+      title: "Director of Industry–Academia Cooperation, The Korean Sensors Society",
+    },
+    {
+      period: "Sep. 2025 – Jun. 2026",
+      title: "Co-organizer of Materials and Devices for Smart Sensors, GCIM2026",
+    },
+    {
+      period: "Nov. 2025 – Oct. 2026",
+      title:
+        "Early Career Editorial Board Member of Nanotechnology and Precision Engineering, AIP Publishing",
+    },
+    {
+      period: "Nov. 11 – Nov. 13, 2019",
+      title:
+        "Program Organizer of Korea Univ.–Kyushu Univ. Student Joint Workshop, Kyushu University",
+      location: "Fukuoka, Japan",
+      advisors: ["Prof. Jong-Heun Lee", "Prof. Kengo Shimanoe"],
+    },
+    {
+      period: "Mar. 4 – Mar. 15, 2019",
+      title:
+        "Visiting Student, Block Course of Chemical Sensors, University of Tübingen",
+      location: "Tübingen, Germany",
+      advisors: ["Prof. Udo Weimer", "Dr. Nicolae Barsan"],
+    },
+    {
+      period: "Aug. 27 – Aug. 31, 2018",
+      title: "Visiting Student, National Research Nuclear University MEPhI",
+      location: "Moscow, Russia",
+      advisors: ["Prof. Nikolay Samotaev"],
+    },
+    {
+      period: "Jul. 7 – Jul. 24, 2018",
+      title:
+        "Visiting Student, Signal Processing of Chemical Sensor Array, Kangwon National University",
+      location: "Samcheok, Korea",
+      advisors: ["Prof. Hyung-Gi Byun"],
+    },
+    {
+      period: "Jan. 30, 2012 – Oct. 29, 2013",
+      title:
+        "Non-academic career: Military Service, ROK Army 7th Infantry Division Air Defence",
+      location: "Hwacheon, Korea",
+    },
   ],
   awardsHonors: [
-    "Early Career Research Award placeholder",
-    "Outstanding Teaching and Mentorship Recognition placeholder",
-    "Best Paper or Presentation Award placeholder",
+    {
+      period: "Mar. 2022 – Feb. 2027",
+      title:
+        "Sejong Science Fellowship Grant ($100,000/year), National Research Foundation of Korea (NRF) by the Korea government",
+      location: "Korea",
+      details: [
+        "Given to 311 researchers out of postdoctoral researchers.",
+        "Project: Room Temperature High Performance Gas Sensor using Light-Activated Metal-Organic Frameworks",
+      ],
+    },
+    {
+      period: "Mar. 2022 – Feb. 2023",
+      title:
+        "Postdoctoral Fellowship ($32,200), Brain Korea 21 PLUS (BK21 PLUS), Ministry of Science and ICT",
+      location: "Korea",
+    },
+    {
+      period: "Feb. 2022",
+      title: "KU Achievement Award, Korea University",
+      location: "Korea",
+      details: ["Given to 32 graduate students out of 8700."],
+    },
+    {
+      period: "Feb. 2022",
+      title: "Best Paper Award, BK21 Plus Program in Korea University",
+      location: "Korea",
+    },
+    {
+      period: "Aug. 2021",
+      title: "Best Paper Award, Korea University",
+      location: "Korea",
+    },
+    {
+      period: "Nov. 2018",
+      title: "Best Paper Presentation Award, Korea Sensors Society",
+      location: "Korea",
+    },
+    {
+      period: "Aug. 2018",
+      title:
+        "Best Poster Paper Award, International Union of Materials Research Societies-ICEM 2018",
+      location: "Korea",
+    },
   ],
 };
 
