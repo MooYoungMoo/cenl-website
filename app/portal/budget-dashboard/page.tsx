@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalShell } from "@/components/portal-shell";
 import { supabase } from "@/lib/supabase/client";
@@ -17,6 +18,15 @@ type FundingSource = {
   activities_budget?: number | null;
   is_active?: boolean | null;
   active?: boolean | null;
+};
+
+type Profile = {
+  role?: string | null;
+};
+
+type FundingSourceManager = {
+  funding_source_id: string;
+  user_id: string;
 };
 
 type Merchant = {
@@ -147,18 +157,52 @@ function getMerchantTotals(
     }, {});
 }
 
+function canViewAllFundingSources(role: string | null) {
+  return role === "professor" || role === "admin";
+}
+
 export default function BudgetDashboardPage() {
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [role, setRole] = useState<string | null>(null);
+  const [managedFundingSourceIds, setManagedFundingSourceIds] = useState<
+    string[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const userCanViewAll = canViewAllFundingSources(role);
+  const userIsProjectAdmin = managedFundingSourceIds.length > 0;
+  const userCanViewBudgets = userCanViewAll || userIsProjectAdmin;
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
 
-    const [sourcesResult, requestsResult] = await Promise.all([
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setRole(null);
+      setManagedFundingSourceIds([]);
+      setFundingSources([]);
+      setRequests([]);
+      setMerchantMap({});
+      setErrorMessage("Please sign in again before viewing budgets.");
+      setLoading(false);
+      return;
+    }
+
+    const [profileResult, managerResult, sourcesResult, requestsResult] =
+      await Promise.all([
+        supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("funding_source_managers")
+          .select("*")
+          .eq("user_id", user.id),
       supabase.from("funding_sources").select("*").order("name", {
         ascending: true,
       }),
@@ -166,16 +210,36 @@ export default function BudgetDashboardPage() {
         .from("purchase_requests")
         .select(requestSelect)
         .order("requested_at", { ascending: false }),
-    ]);
+      ]);
+
+    const nextRole = profileResult.error
+      ? null
+      : (((profileResult.data as Profile | null)?.role ?? null)?.toLowerCase() ??
+        null);
+    const nextManagedIds = ((managerResult.data ?? []) as FundingSourceManager[])
+      .map((manager) => manager.funding_source_id)
+      .filter(Boolean);
+
+    setRole(nextRole);
+    setManagedFundingSourceIds(nextManagedIds);
+
+    const canViewAll = canViewAllFundingSources(nextRole);
+    const canViewBudgets = canViewAll || nextManagedIds.length > 0;
 
     if (sourcesResult.error) {
       setFundingSources([]);
       setErrorMessage(sourcesResult.error.message);
+    } else if (!canViewBudgets) {
+      setFundingSources([]);
     } else {
       const activeSources = ((sourcesResult.data ?? []) as FundingSource[]).filter(
         (source) => source.is_active !== false && source.active !== false,
       );
-      setFundingSources(activeSources);
+      setFundingSources(
+        canViewAll
+          ? activeSources
+          : activeSources.filter((source) => nextManagedIds.includes(source.id)),
+      );
     }
 
     if (requestsResult.error) {
@@ -311,13 +375,25 @@ export default function BudgetDashboardPage() {
         </div>
       ) : null}
 
-      {!loading && fundingSources.length === 0 && !errorMessage ? (
+      {!loading && !userCanViewBudgets && !errorMessage ? (
         <div className="portal-card mt-6 rounded-md border border-dashed border-line p-8 text-center text-sm text-muted">
-          No Funding Sources have been created yet.
+          Budget Dashboard is available to professor/admin users and assigned
+          project admins.
         </div>
       ) : null}
 
-      {!loading && budgetSummaries.length > 0 ? (
+      {!loading &&
+      userCanViewBudgets &&
+      fundingSources.length === 0 &&
+      !errorMessage ? (
+        <div className="portal-card mt-6 rounded-md border border-dashed border-line p-8 text-center text-sm text-muted">
+          {userCanViewAll
+            ? "No Funding Sources have been created yet."
+            : "No funding sources are assigned to you."}
+        </div>
+      ) : null}
+
+      {!loading && userCanViewBudgets && budgetSummaries.length > 0 ? (
         <section className="mt-8 grid gap-3 md:grid-cols-4">
           <div className="rounded-md border border-line bg-white/75 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
@@ -354,7 +430,7 @@ export default function BudgetDashboardPage() {
         </section>
       ) : null}
 
-      {!loading && budgetSummaries.length > 0 ? (
+      {!loading && userCanViewBudgets && budgetSummaries.length > 0 ? (
         <div className="mt-6 grid gap-5">
           {budgetSummaries.map((summary) => {
             const materialsRemaining =
@@ -394,6 +470,12 @@ export default function BudgetDashboardPage() {
                         ))}
                       </div>
                     ) : null}
+                    <Link
+                      href={`/portal/funding-sources/${summary.source.id}`}
+                      className="mt-4 inline-flex rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white"
+                    >
+                      View details
+                    </Link>
                   </div>
                   <div className="rounded-md bg-brand-soft px-4 py-3 text-right">
                     <p className="text-sm text-muted">Total remaining</p>
@@ -501,7 +583,7 @@ export default function BudgetDashboardPage() {
         </div>
       ) : null}
 
-      {!loading ? (
+      {!loading && userCanViewBudgets ? (
         <section className="mt-10">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
             Unassigned Pending Payments

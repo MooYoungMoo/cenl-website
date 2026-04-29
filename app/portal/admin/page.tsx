@@ -55,6 +55,13 @@ type MerchantUsage = {
   merchant_id: string | null;
 };
 
+type FundingSourceManager = {
+  id?: string;
+  funding_source_id: string;
+  user_id: string;
+  created_at?: string | null;
+};
+
 type ManagedProfile = {
   id: string;
   full_name: string | null;
@@ -146,6 +153,12 @@ export default function AdminPage() {
   const [usedFundingSourceIds, setUsedFundingSourceIds] = useState<string[]>(
     [],
   );
+  const [fundingSourceManagers, setFundingSourceManagers] = useState<
+    FundingSourceManager[]
+  >([]);
+  const [managerUserDrafts, setManagerUserDrafts] = useState<
+    Record<string, string>
+  >({});
   const [usedMerchantIds, setUsedMerchantIds] = useState<string[]>([]);
   const [merchantReviews, setMerchantReviews] = useState<MerchantReview[]>([]);
   const [profiles, setProfiles] = useState<ManagedProfile[]>([]);
@@ -169,7 +182,18 @@ export default function AdminPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManage = canManage(role);
+  const userIsGlobalManager = canManage(role);
+
+  const projectManagedFundingSourceIds = useMemo(
+    () =>
+      fundingSourceManagers
+        .filter((manager) => manager.user_id === currentUserId)
+        .map((manager) => manager.funding_source_id),
+    [currentUserId, fundingSourceManagers],
+  );
+
+  const userIsProjectAdmin = projectManagedFundingSourceIds.length > 0;
+  const userCanUseAdmin = userIsGlobalManager || userIsProjectAdmin;
 
   const activeFundingSources = useMemo(
     () => fundingSources.filter((source) => source.is_active !== false),
@@ -209,6 +233,15 @@ export default function AdminPage() {
           second.full_name || second.email || "",
         ),
       ),
+    [profiles],
+  );
+
+  const profileMap = useMemo(
+    () =>
+      profiles.reduce<Record<string, ManagedProfile>>((accumulator, profile) => {
+        accumulator[profile.id] = profile;
+        return accumulator;
+      }, {}),
     [profiles],
   );
 
@@ -292,6 +325,22 @@ export default function AdminPage() {
         .filter((id): id is string => Boolean(id));
       setUsedFundingSourceIds(Array.from(new Set(usedIds)));
     }
+  }, []);
+
+  const loadFundingSourceManagers = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("funding_source_managers")
+      .select("*");
+
+    if (error) {
+      setFundingSourceManagers([]);
+      setErrorMessage(error.message);
+      return [];
+    }
+
+    const nextManagers = (data ?? []) as FundingSourceManager[];
+    setFundingSourceManagers(nextManagers);
+    return nextManagers;
   }, []);
 
   const loadMerchantReviews = useCallback(async () => {
@@ -392,16 +441,24 @@ export default function AdminPage() {
       ((profile as Profile | null)?.role ?? null)?.toLowerCase() ?? null;
     setRole(nextRole);
 
+    const nextManagers = await loadFundingSourceManagers();
+    const hasProjectAdminAccess = nextManagers.some(
+      (manager) => manager.user_id === user.id,
+    );
+
     if (canManage(nextRole)) {
-      await Promise.all([
-        loadFundingSources(),
-        loadMerchantReviews(),
-        loadProfiles(),
-      ]);
+      await Promise.all([loadFundingSources(), loadMerchantReviews(), loadProfiles()]);
+    } else if (hasProjectAdminAccess) {
+      await loadMerchantReviews();
     }
 
     setLoading(false);
-  }, [loadFundingSources, loadMerchantReviews, loadProfiles]);
+  }, [
+    loadFundingSourceManagers,
+    loadFundingSources,
+    loadMerchantReviews,
+    loadProfiles,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -466,7 +523,7 @@ export default function AdminPage() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    if (!userCanManage) {
+    if (!userIsGlobalManager) {
       setErrorMessage("You do not have permission to manage funding sources.");
       return;
     }
@@ -587,6 +644,80 @@ export default function AdminPage() {
     setSuccessMessage("Funding source updated.");
     setSaving(false);
     await loadFundingSources();
+  };
+
+  const handleAssignFundingSourceManager = async (sourceId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const userId = managerUserDrafts[sourceId];
+
+    if (!userId) {
+      setErrorMessage("Select a user to assign as project admin.");
+      return;
+    }
+
+    const alreadyAssigned = fundingSourceManagers.some(
+      (manager) =>
+        manager.funding_source_id === sourceId && manager.user_id === userId,
+    );
+
+    if (alreadyAssigned) {
+      setErrorMessage("This user is already assigned to this Funding Source.");
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase.from("funding_source_managers").insert({
+      funding_source_id: sourceId,
+      user_id: userId,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Project admin assigned to Funding Source.");
+    setManagerUserDrafts((current) => ({ ...current, [sourceId]: "" }));
+    setSaving(false);
+    await loadFundingSourceManagers();
+  };
+
+  const handleRemoveFundingSourceManager = async (
+    sourceId: string,
+    userId: string,
+  ) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const confirmed = window.confirm(
+      "Remove this project admin from the Funding Source?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("funding_source_managers")
+      .delete()
+      .eq("funding_source_id", sourceId)
+      .eq("user_id", userId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Project admin removed from Funding Source.");
+    setSaving(false);
+    await loadFundingSourceManagers();
   };
 
   const handleFinishFundingSource = async (sourceId: string) => {
@@ -1189,6 +1320,12 @@ export default function AdminPage() {
         Full content management, file uploads, and notifications are still
         intentionally out of scope.
       </p>
+      <p className="mt-2 max-w-2xl text-xs leading-6 text-muted">
+        profiles.role controls global student/professor/admin access.
+        funding_source_managers controls project-specific admin assignment; do
+        not make student project admins global admins unless they need global
+        access.
+      </p>
 
       {loading ? (
         <div className="portal-card mt-8 rounded-md border border-line p-5 text-sm text-muted">
@@ -1196,9 +1333,9 @@ export default function AdminPage() {
         </div>
       ) : null}
 
-      {!loading && !userCanManage ? (
+      {!loading && !userCanUseAdmin ? (
         <div className="mt-8 rounded-md bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
-          You do not have permission to manage funding sources or merchants.
+          You do not have permission to manage Admin tools.
         </div>
       ) : null}
 
@@ -1214,10 +1351,11 @@ export default function AdminPage() {
         </div>
       ) : null}
 
-      {!loading && userCanManage ? (
+      {!loading && userCanUseAdmin ? (
         <div className="mt-8 grid gap-8">
-          {renderUserManagement()}
+          {userIsGlobalManager ? renderUserManagement() : null}
 
+          {userIsGlobalManager ? (
           <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
               Funding Sources
@@ -1339,6 +1477,9 @@ export default function AdminPage() {
                   {activeFundingSources.map((source) => {
                     const draft =
                       fundingDrafts[source.id] ?? toFundingForm(source);
+                    const assignedManagers = fundingSourceManagers.filter(
+                      (manager) => manager.funding_source_id === source.id,
+                    );
 
                     return (
                       <article
@@ -1378,6 +1519,90 @@ export default function AdminPage() {
                                 Delete
                               </button>
                             ) : null}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 rounded-md border border-line/70 bg-white/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+                                Project Admins
+                              </p>
+                              <p className="mt-1 text-xs text-muted">
+                                Assigned here through funding_source_managers,
+                                separate from profiles.role.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <select
+                                value={managerUserDrafts[source.id] ?? ""}
+                                onChange={(event) =>
+                                  setManagerUserDrafts((current) => ({
+                                    ...current,
+                                    [source.id]: event.target.value,
+                                  }))
+                                }
+                                className="rounded-md border border-line bg-white px-3 py-2 text-xs outline-none transition focus:border-brand"
+                              >
+                                <option value="">Select user</option>
+                                {sortedProfiles.map((profile) => (
+                                  <option key={profile.id} value={profile.id}>
+                                    {profile.full_name ||
+                                      profile.email ||
+                                      profile.id.slice(0, 8)}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() =>
+                                  void handleAssignFundingSourceManager(
+                                    source.id,
+                                  )
+                                }
+                                className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                              >
+                                Assign
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {assignedManagers.length === 0 ? (
+                              <span className="text-xs text-muted">
+                                No project admins assigned.
+                              </span>
+                            ) : null}
+                            {assignedManagers.map((manager) => {
+                              const managerProfile =
+                                profileMap[manager.user_id];
+
+                              return (
+                                <span
+                                  key={`${manager.funding_source_id}-${manager.user_id}`}
+                                  className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs text-muted"
+                                >
+                                  {managerProfile?.full_name ||
+                                    managerProfile?.email ||
+                                    manager.user_id.slice(0, 8)}
+                                  <button
+                                    type="button"
+                                    disabled={saving}
+                                    onClick={() =>
+                                      void handleRemoveFundingSourceManager(
+                                        source.id,
+                                        manager.user_id,
+                                      )
+                                    }
+                                    className="font-semibold text-accent transition hover:text-foreground disabled:opacity-60"
+                                    aria-label="Remove project admin"
+                                  >
+                                    x
+                                  </button>
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -1578,6 +1803,7 @@ export default function AdminPage() {
               </div>
             </div>
           </section>
+          ) : null}
 
           <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">

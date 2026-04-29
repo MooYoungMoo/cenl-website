@@ -52,6 +52,11 @@ type FundingSource = {
   active?: boolean | null;
 };
 
+type FundingSourceManager = {
+  funding_source_id: string;
+  user_id: string;
+};
+
 type MerchantGroup = {
   key: string;
   merchantId: string | null;
@@ -178,6 +183,10 @@ export default function PaymentTrackerPage() {
   const [selectedFundingSourceId, setSelectedFundingSourceId] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [role, setRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [managedFundingSourceIds, setManagedFundingSourceIds] = useState<
+    string[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [fundingLoading, setFundingLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -185,7 +194,9 @@ export default function PaymentTrackerPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const userCanManagePayments = canManagePayments(role);
+  const userIsGlobalManager = canManagePayments(role);
+  const userIsProjectAdmin = managedFundingSourceIds.length > 0;
+  const userCanManagePayments = userIsGlobalManager || userIsProjectAdmin;
 
   const fundingSourceMap = useMemo(
     () =>
@@ -199,22 +210,40 @@ export default function PaymentTrackerPage() {
     [fundingSources],
   );
 
-  const loadFundingSources = useCallback(async () => {
+  const loadFundingSources = useCallback(async (userId: string, userRole: string | null) => {
     setFundingLoading(true);
 
-    const { data, error } = await supabase
+    const [sourcesResult, managersResult] = await Promise.all([
+      supabase
       .from("funding_sources")
       .select("*")
-      .order("name", { ascending: true });
+        .order("name", { ascending: true }),
+      userId
+        ? supabase
+            .from("funding_source_managers")
+            .select("*")
+            .eq("user_id", userId)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
-    if (error) {
+    if (sourcesResult.error) {
       setFundingSources([]);
-      setErrorMessage(error.message);
+      setErrorMessage(sourcesResult.error.message);
     } else {
-      const activeSources = ((data ?? []) as FundingSource[]).filter(
+      const assignedIds = ((managersResult.data ?? []) as FundingSourceManager[])
+        .map((manager) => manager.funding_source_id)
+        .filter(Boolean);
+
+      setManagedFundingSourceIds(assignedIds);
+
+      const activeSources = ((sourcesResult.data ?? []) as FundingSource[]).filter(
         (source) => source.is_active !== false && source.active !== false,
       );
-      setFundingSources(activeSources);
+      setFundingSources(
+        canManagePayments(userRole)
+          ? activeSources
+          : activeSources.filter((source) => assignedIds.includes(source.id)),
+      );
     }
 
     setFundingLoading(false);
@@ -299,10 +328,14 @@ export default function PaymentTrackerPage() {
 
     if (userError || !user) {
       setRole(null);
+      setCurrentUserId(null);
+      setManagedFundingSourceIds([]);
       setErrorMessage("Please sign in again before viewing payment requests.");
       setLoading(false);
       return;
     }
+
+    setCurrentUserId(user.id);
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -321,9 +354,7 @@ export default function PaymentTrackerPage() {
     setRole(nextRole);
     await loadRequests();
 
-    if (canManagePayments(nextRole)) {
-      await loadFundingSources();
-    }
+    await loadFundingSources(user.id, nextRole);
 
     setLoading(false);
   }, [loadFundingSources, loadRequests]);
@@ -394,6 +425,14 @@ export default function PaymentTrackerPage() {
       return;
     }
 
+    if (
+      !userIsGlobalManager &&
+      !managedFundingSourceIds.includes(selectedFundingSourceId)
+    ) {
+      setErrorMessage("Select one of your assigned Funding Sources.");
+      return;
+    }
+
     setSaving(true);
 
     const updatePayload: {
@@ -437,6 +476,17 @@ export default function PaymentTrackerPage() {
 
     if (!userCanManagePayments) {
       setErrorMessage("You do not have permission to undo payments.");
+      return;
+    }
+
+    if (
+      !userIsGlobalManager &&
+      (!request.funding_source_id ||
+        !managedFundingSourceIds.includes(request.funding_source_id))
+    ) {
+      setErrorMessage(
+        "You can only undo payments made under your assigned Funding Sources.",
+      );
       return;
     }
 
@@ -492,7 +542,8 @@ export default function PaymentTrackerPage() {
 
       {!loading && !userCanManagePayments ? (
         <div className="mt-6 rounded-md bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
-          Payment controls are available only to professor/admin users.
+          Payment controls are available only to professor/admin users or
+          assigned project admins.
         </div>
       ) : null}
 
@@ -559,7 +610,9 @@ export default function PaymentTrackerPage() {
 
           {!fundingLoading && fundingSources.length === 0 ? (
             <p className="mt-3 rounded-md bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
-              No Funding Sources have been created yet.
+              {userIsGlobalManager
+                ? "No Funding Sources have been created yet."
+                : "No funding sources are assigned to you."}
             </p>
           ) : null}
 
@@ -783,7 +836,15 @@ export default function PaymentTrackerPage() {
                       </p>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                         <span>{formatDate(request.paid_at)}</span>
-                        {userCanManagePayments && request.status === "paid" ? (
+                        {userCanManagePayments &&
+                        request.status === "paid" &&
+                        (userIsGlobalManager ||
+                          Boolean(
+                            request.funding_source_id &&
+                              managedFundingSourceIds.includes(
+                                request.funding_source_id,
+                              ),
+                          )) ? (
                           <button
                             type="button"
                             disabled={undoingRequestId === request.id}
