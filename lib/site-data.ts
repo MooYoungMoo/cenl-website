@@ -88,6 +88,11 @@ export type ContactCard = {
   title: string;
   icon: LucideIcon;
   description: string;
+  fields?: {
+    label: string;
+    values: string[];
+    type?: "email" | "text";
+  }[];
 };
 
 export type StatItem = {
@@ -637,13 +642,31 @@ export const newsItems: NewsItem[] = [
   },
 ];
 
-export const contactDetails: string[] = [
-  siteMeta.fullName,
-  siteMeta.office,
-  "Department placeholder, University placeholder",
-  siteMeta.location,
-  "Email: cenl@example.edu",
-];
+export const contactDetails = {
+  lab: "ChemoElectronic Nanomaterials Lab",
+  pi: "Young-Moo Jo, Ph.D.",
+  position: "Assistant Professor",
+  affiliation: [
+    "School of Materials Science & Engineering",
+    "Kyungpook National University",
+  ],
+  emails: ["jym754@knu.ac.kr", "jym754@gmail.com"],
+  address: "TBD",
+};
+
+export const recruitingInformation = {
+  title: "M.S. & Ph.D. Recruiting",
+  description:
+    "We are looking for motivated students interested in chemoelectronic nanomaterials, gas sensors, electronic nose systems, and materials-based sensing platforms.",
+  areas: [
+    "Chemoelectronic nanomaterials",
+    "Gas sensors",
+    "Electronic nose systems",
+    "Metal-organic frameworks",
+    "Sensor materials and devices",
+  ],
+  applicationContacts: ["jym754@knu.ac.kr", "jym754@gmail.com"],
+};
 
 export type PortalLink = {
   href: string;
@@ -748,15 +771,32 @@ export const homeFeatureLinks: IconLink[] = [
 
 export const contactHighlights: ContactCard[] = [
   {
-    title: "M.S. & Ph.D. Recruiting",
+    title: recruitingInformation.title,
     icon: GraduationCap,
-    description:
-      "CENL welcomes motivated students interested in nanomaterials, chemical sensors, electronics, data analysis, and hands-on device research.",
+    description: recruitingInformation.description,
+    fields: [
+      {
+        label: "Recruiting areas",
+        values: recruitingInformation.areas,
+      },
+      {
+        label: "Application contact",
+        values: recruitingInformation.applicationContacts,
+        type: "email",
+      },
+    ],
   },
   {
     title: "Lab Contact",
     icon: Mail,
-    description:
-      "Prospective students and collaborators can reach the lab by email with a short introduction, research interests, and relevant background.",
+    description: "",
+    fields: [
+      { label: "Lab", values: [contactDetails.lab] },
+      { label: "PI", values: [contactDetails.pi] },
+      { label: "Position", values: [contactDetails.position] },
+      { label: "Affiliation", values: contactDetails.affiliation },
+      { label: "Email", values: contactDetails.emails, type: "email" },
+      { label: "Address", values: [contactDetails.address] },
+    ],
   },
 ];

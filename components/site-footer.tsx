@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { contactDetails, navigation, siteMeta } from "@/lib/site-data";
+import { contactDetails, navigation } from "@/lib/site-data";
 
 export function SiteFooter() {
   return (
@@ -31,11 +31,15 @@ export function SiteFooter() {
             Contact
           </p>
           <div className="grid gap-1 text-sm leading-7 text-muted">
-            {contactDetails.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-            <a href={`mailto:${siteMeta.email}`} className="hover:text-brand">
-              {siteMeta.email}
+            <p>{contactDetails.lab}</p>
+            <p>{contactDetails.pi}</p>
+            <p>{contactDetails.affiliation[0]}</p>
+            <p>{contactDetails.affiliation[1]}</p>
+            <a
+              href={`mailto:${contactDetails.emails[0]}`}
+              className="hover:text-brand"
+            >
+              {contactDetails.emails[0]}
             </a>
           </div>
         </div>
