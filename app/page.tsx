@@ -1,19 +1,17 @@
 import Link from "next/link";
 import { ArrowRight, FlaskConical, Mail } from "lucide-react";
+import { LatestNewsSection } from "@/components/latest-news-section";
 import { LatestPublicationsSection } from "@/components/latest-publications-section";
 import { SectionHeading } from "@/components/section-heading";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import {
   homeFeatureLinks,
-  newsItems,
   quickStats,
   researchTopics,
   siteMeta,
 } from "@/lib/site-data";
 
 export default function HomePage() {
-  const latestNews = newsItems.slice(0, 3);
-
   return (
     <div>
       <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-14 lg:grid-cols-[1fr_520px] lg:items-center">
@@ -100,34 +98,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#eef3f6]">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <SectionHeading
-            eyebrow="Latest News"
-            title="Recent activity from CENL"
-            description="News cards are static placeholders for now, with detail pages already wired into the frontend routing."
-          />
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {latestNews.map((item) => (
-              <article
-                key={item.slug}
-                className="elevated-card border border-line bg-white p-6"
-              >
-                <p className="text-sm font-medium text-brand">{item.date}</p>
-                <h3 className="mt-3 text-xl font-semibold">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted">{item.summary}</p>
-                <Link
-                  href={`/news/${item.slug}`}
-                  className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand"
-                >
-                  Read more
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LatestNewsSection />
 
       <section className="mx-auto grid max-w-7xl gap-5 px-6 py-16 md:grid-cols-3">
         {homeFeatureLinks.map((item) => {

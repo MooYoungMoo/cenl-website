@@ -505,11 +505,11 @@ export const patents: PatentItem[] = [
 ];
 
 export type NewsCategory =
-  | "student awards"
-  | "PI awards"
-  | "group events"
-  | "research updates"
-  | "general lab news";
+  | "Student Awards"
+  | "PI Awards"
+  | "Group Events"
+  | "Research Updates"
+  | "General Lab News";
 
 export type NewsCategoryFilter = NewsCategory | "all";
 
@@ -520,6 +520,7 @@ export type NewsCategoryOption = {
 
 export type NewsGalleryImage = {
   label: string;
+  url?: string;
   caption?: string;
 };
 
@@ -531,23 +532,24 @@ export type NewsItem = {
   summary: string;
   body: string[];
   representativeImage: string;
+  imageUrl?: string;
   galleryImages: NewsGalleryImage[];
 };
 
 export const newsCategoryOptions: NewsCategoryOption[] = [
   { label: "All", value: "all" },
-  { label: "Student Awards", value: "student awards" },
-  { label: "PI Awards", value: "PI awards" },
-  { label: "Group Events", value: "group events" },
-  { label: "Research Updates", value: "research updates" },
-  { label: "General Lab News", value: "general lab news" },
+  { label: "Student Awards", value: "Student Awards" },
+  { label: "PI Awards", value: "PI Awards" },
+  { label: "Group Events", value: "Group Events" },
+  { label: "Research Updates", value: "Research Updates" },
+  { label: "General Lab News", value: "General Lab News" },
 ];
 
 export const newsItems: NewsItem[] = [
   {
     slug: "student-award-sensor-poster",
     date: "April 18, 2026",
-    category: "student awards",
+    category: "Student Awards",
     title: "CENL student receives recognition for sensor poster presentation",
     summary:
       "A student presentation on nanomaterial sensor arrays was recognized at a departmental research showcase.",
@@ -565,7 +567,7 @@ export const newsItems: NewsItem[] = [
   {
     slug: "pi-recognition-chemoelectronic-research",
     date: "March 27, 2026",
-    category: "PI awards",
+    category: "PI Awards",
     title: "PI recognized for contributions to chemoelectronic materials research",
     summary:
       "The lab celebrates a faculty milestone connected to chemical sensing and nanomaterial device research.",
@@ -583,7 +585,7 @@ export const newsItems: NewsItem[] = [
   {
     slug: "spring-group-workshop",
     date: "February 14, 2026",
-    category: "group events",
+    category: "Group Events",
     title: "Spring workshop brings lab members together for research planning",
     summary:
       "CENL held a group workshop to review active projects and plan upcoming experiments.",
@@ -601,7 +603,7 @@ export const newsItems: NewsItem[] = [
   {
     slug: "electronic-nose-platform-update",
     date: "January 30, 2026",
-    category: "research updates",
+    category: "Research Updates",
     title: "Electronic nose platform prototype enters a new testing phase",
     summary:
       "The lab is preparing placeholder evaluation workflows for portable chemical sensing prototypes.",
@@ -619,7 +621,7 @@ export const newsItems: NewsItem[] = [
   {
     slug: "cenl-website-launch",
     date: "January 8, 2026",
-    category: "general lab news",
+    category: "General Lab News",
     title: "CENL launches a refreshed frontend website structure",
     summary:
       "The new website organizes research, members, publications, news, contact information, and portal placeholders.",
@@ -696,6 +698,12 @@ export const portalLinks: PortalLink[] = [
     label: "Publications",
     description: "Manage publication records, visibility, and thumbnails.",
     icon: FileText,
+  },
+  {
+    href: "/portal/news",
+    label: "News",
+    description: "Manage news posts, visibility, and image galleries.",
+    icon: Newspaper,
   },
   {
     href: "/portal/admin",

@@ -53,10 +53,19 @@ export function NewsList({ items }: NewsListProps) {
             href={`/news/${item.slug}`}
             className="elevated-card overflow-hidden border border-line bg-white"
           >
-            <VisualPlaceholder
-              label={item.representativeImage}
-              className="min-h-48 rounded-none"
-            />
+            {item.imageUrl ? (
+              <div
+                className="min-h-48 rounded-none bg-cover bg-center"
+                style={{ backgroundImage: `url(${item.imageUrl})` }}
+                role="img"
+                aria-label={item.representativeImage}
+              />
+            ) : (
+              <VisualPlaceholder
+                label={item.representativeImage}
+                className="min-h-48 rounded-none"
+              />
+            )}
             <div className="p-6">
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="font-medium text-brand">{item.date}</span>
