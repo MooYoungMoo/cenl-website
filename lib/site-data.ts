@@ -736,6 +736,12 @@ export const portalLinks: PortalLink[] = [
     icon: Sparkles,
   },
   {
+    href: "/portal/pi",
+    label: "PI Profile",
+    description: "Manage the public principal investigator profile.",
+    icon: UserRound,
+  },
+  {
     href: "/portal/admin",
     label: "Admin",
     description: "Manage merchants, Funding Sources, and portal operations.",
