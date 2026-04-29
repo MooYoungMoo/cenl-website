@@ -7,7 +7,13 @@ import { SectionHeading } from "@/components/section-heading";
 import { fetchFeaturedNewsPosts } from "@/lib/news";
 import { newsItems, type NewsItem } from "@/lib/site-data";
 
-export function LatestNewsSection() {
+type LatestNewsSectionProps = {
+  title?: string;
+};
+
+export function LatestNewsSection({
+  title = "Recent activity from CENL",
+}: LatestNewsSectionProps) {
   const [items, setItems] = useState<NewsItem[]>(newsItems.slice(0, 3));
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export function LatestNewsSection() {
       <div className="mx-auto max-w-7xl px-6 py-16">
         <SectionHeading
           eyebrow="Latest News"
-          title="Recent activity from CENL"
+          title={title}
           description="News cards highlight featured lab updates from awards, events, research, and general lab activity."
         />
         <div className="mt-10 grid gap-6 lg:grid-cols-3">

@@ -730,6 +730,12 @@ export const portalLinks: PortalLink[] = [
     icon: Mail,
   },
   {
+    href: "/portal/home",
+    label: "Home",
+    description: "Manage homepage hero and section headings.",
+    icon: Sparkles,
+  },
+  {
     href: "/portal/admin",
     label: "Admin",
     description: "Manage merchants, Funding Sources, and portal operations.",
