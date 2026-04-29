@@ -63,9 +63,11 @@ export type PiProfile = {
 export type LabMember = {
   id: string;
   name: string;
+  role?: string;
   degree: string;
   biography: string;
   email: string;
+  photoUrl?: string;
 };
 
 export type AlumniProfile = {
@@ -74,6 +76,8 @@ export type AlumniProfile = {
   role: string;
   affiliation: string;
   contact: string;
+  biography?: string;
+  photoUrl?: string;
 };
 
 export type PatentItem = {
@@ -704,6 +708,12 @@ export const portalLinks: PortalLink[] = [
     label: "News",
     description: "Manage news posts, visibility, and image galleries.",
     icon: Newspaper,
+  },
+  {
+    href: "/portal/members",
+    label: "Members",
+    description: "Manage current member and alumni profile cards.",
+    icon: Users,
   },
   {
     href: "/portal/admin",
