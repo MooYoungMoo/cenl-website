@@ -385,12 +385,12 @@ export default function PaymentTrackerPage() {
     }
 
     if (selectedRequestIds.length === 0) {
-      setErrorMessage("Select at least one pending request to mark as paid.");
+      setErrorMessage("Select at least one Pending Payment item to mark as Paid.");
       return;
     }
 
     if (!selectedFundingSourceId) {
-      setErrorMessage("Select a funding source before marking requests as paid.");
+      setErrorMessage("Select a Funding Source before marking requests as Paid.");
       return;
     }
 
@@ -424,7 +424,7 @@ export default function PaymentTrackerPage() {
       return;
     }
 
-    setSuccessMessage("Selected requests were marked as paid.");
+    setSuccessMessage("Selected Pending Payment items were marked as Paid.");
     setSelectedRequestIds([]);
     setPaymentNote("");
     setSaving(false);
@@ -473,16 +473,16 @@ export default function PaymentTrackerPage() {
   return (
     <PortalShell
       title="Payment Tracker"
-      description="Group pending merchant requests and record paid expenses."
+      description="Group Pending Payment items by Merchant and record Paid expenses."
     >
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Payment Tracker
       </p>
       <h2 className="mt-4 text-3xl font-semibold">
-        Merchant-based pending payments
+        Merchant-based Pending Payments
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
-        Pending requests are grouped by merchant identity when available, with
+        Pending Payment items are grouped by Merchant identity when available, with
         older text-only rows grouped by normalized merchant text.
       </p>
       <p className="mt-2 max-w-3xl text-xs leading-6 text-muted">
@@ -513,7 +513,7 @@ export default function PaymentTrackerPage() {
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-foreground">
-                Funding source
+                Funding Source
               </span>
               <select
                 value={selectedFundingSourceId}
@@ -522,7 +522,7 @@ export default function PaymentTrackerPage() {
                 }
                 className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
               >
-                <option value="">Select funding source</option>
+                <option value="">Select Funding Source</option>
                 {fundingSources.map((source) => (
                   <option key={source.id} value={source.id}>
                     {source.name}
@@ -554,17 +554,17 @@ export default function PaymentTrackerPage() {
           </div>
 
           {fundingLoading ? (
-            <p className="mt-3 text-sm text-muted">Loading funding sources...</p>
+            <p className="mt-3 text-sm text-muted">Loading Funding Sources...</p>
           ) : null}
 
           {!fundingLoading && fundingSources.length === 0 ? (
             <p className="mt-3 rounded-md bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
-              No funding sources have been created yet.
+              No Funding Sources have been created yet.
             </p>
           ) : null}
 
           <p className="mt-3 text-sm text-muted">
-            Selected pending requests: {selectedRequestIds.length}
+            Selected Pending Payment items: {selectedRequestIds.length}
           </p>
         </section>
       ) : null}
@@ -573,10 +573,10 @@ export default function PaymentTrackerPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Pending by Merchant
+              Pending Payments by Merchant
             </p>
             <h3 className="mt-2 text-2xl font-semibold">
-              Pending payment queue
+              Pending Payment queue
             </h3>
           </div>
           <button
@@ -596,7 +596,7 @@ export default function PaymentTrackerPage() {
 
         {!loading && pendingGroups.length === 0 && !errorMessage ? (
           <div className="portal-card mt-5 rounded-md border border-dashed border-line p-8 text-center text-sm text-muted">
-            No pending payment requests yet.
+            No Pending Payment items yet.
           </div>
         ) : null}
 
@@ -734,7 +734,7 @@ export default function PaymentTrackerPage() {
             Paid by Merchant
           </p>
           <h3 className="mt-2 text-2xl font-semibold">
-            Completed payment history
+            Paid request history
           </h3>
           <div className="mt-5 grid gap-3">
             {paidGroups.map((group) => (
@@ -778,8 +778,8 @@ export default function PaymentTrackerPage() {
                       <p>
                         {request.funding_source_id
                           ? fundingSourceMap[request.funding_source_id]?.name ??
-                            "Funding source assigned"
-                          : "No funding source"}
+                            "Funding Source assigned"
+                          : "No Funding Source"}
                       </p>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                         <span>{formatDate(request.paid_at)}</span>

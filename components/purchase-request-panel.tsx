@@ -642,7 +642,7 @@ export function PurchaseRequestPanel() {
     setForm(initialForm);
     setMerchantSearch("");
     setSelectedMerchant(null);
-    setSuccessMessage("Purchase request submitted for payment tracking.");
+    setSuccessMessage("Purchase request created as a Pending Payment item.");
     setSubmitting(false);
     await loadRequests();
   };
@@ -653,7 +653,7 @@ export function PurchaseRequestPanel() {
         Payment Request
       </p>
       <h2 className="mt-4 text-3xl font-semibold">
-        Submit a pending payment request
+        Submit a Pending Payment request
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
         Search for an existing merchant first. If it is not listed, add a new
@@ -1061,8 +1061,8 @@ export function PurchaseRequestPanel() {
                         <p>
                           {request.funding_source_id
                             ? fundingSourceMap[request.funding_source_id]
-                                ?.name ?? "Funding source assigned"
-                            : "No funding source"}
+                                ?.name ?? "Funding Source assigned"
+                            : "No Funding Source"}
                         </p>
                         <p>{formatDate(request.paid_at)}</p>
                       </div>

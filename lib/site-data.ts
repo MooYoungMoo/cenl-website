@@ -9,7 +9,6 @@ import {
   Mail,
   Microscope,
   Newspaper,
-  Receipt,
   ScrollText,
   ShieldCheck,
   Sparkles,
@@ -668,33 +667,33 @@ export type PortalLink = {
 
 export const portalLinks: PortalLink[] = [
   {
-    href: "/portal/purchase-request",
-    label: "Purchase Request",
-    description: "Submit merchant-based requests for pending payment tracking.",
-    icon: ClipboardList,
+    href: "/portal",
+    label: "Portal Home",
+    description: "Review the lab payment workflow and portal tools.",
+    icon: Gauge,
   },
   {
-    href: "/portal/budget-dashboard",
-    label: "Budget Dashboard",
-    description: "Preview grant balances, planned spending, and budget summaries.",
-    icon: Wallet,
+    href: "/portal/purchase-request",
+    label: "Purchase Request",
+    description: "Submit merchant-based requests as Pending Payment items.",
+    icon: ClipboardList,
   },
   {
     href: "/portal/approval-history",
     label: "Payment Tracker",
-    description: "Group pending merchant requests and record paid expenses.",
+    description: "Review Pending Payment items by merchant and mark them Paid.",
     icon: FolderKanban,
   },
   {
-    href: "/portal/receipts",
-    label: "Receipts",
-    description: "Organize receipt placeholders for future reimbursement workflows.",
-    icon: Receipt,
+    href: "/portal/budget-dashboard",
+    label: "Budget Dashboard",
+    description: "Monitor Funding Source budgets using paid request totals.",
+    icon: Wallet,
   },
   {
     href: "/portal/admin",
     label: "Admin",
-    description: "Private-looking controls for lab operations and portal settings.",
+    description: "Manage merchants, Funding Sources, and portal operations.",
     icon: ShieldCheck,
   },
 ];
@@ -702,7 +701,7 @@ export const portalLinks: PortalLink[] = [
 export const purchaseRequestFields: string[] = [
   "Item or Service",
   "Requester",
-  "Grant or Project",
+  "Funding Source",
   "Estimated Cost",
 ];
 
@@ -710,7 +709,7 @@ export const budgetDashboardCards: PortalDashboardCard[] = [
   { label: "Funding Sources", value: "3" },
   { label: "Pending Payments", value: "12" },
   { label: "Paid Requests", value: "5" },
-  { label: "Receipt Queue", value: "8" },
+  { label: "Unassigned Pending", value: "8" },
 ];
 
 export const receiptItems: string[] = [

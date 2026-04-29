@@ -275,16 +275,16 @@ export default function BudgetDashboardPage() {
   return (
     <PortalShell
       title="Budget Dashboard"
-      description="Track paid request totals against funding source budgets."
+      description="Track paid request totals against Funding Source budgets."
     >
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Funding Overview
       </p>
       <h2 className="mt-4 text-3xl font-semibold">
-        Funding source budget summary
+        Funding Source budget summary
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
-        Paid requests are counted against their assigned funding source.
+        Paid requests are counted against their assigned Funding Source.
         Pending merchant requests are shown separately and are not subtracted
         from budgets until marked as paid.
       </p>
@@ -313,7 +313,7 @@ export default function BudgetDashboardPage() {
 
       {!loading && fundingSources.length === 0 && !errorMessage ? (
         <div className="portal-card mt-6 rounded-md border border-dashed border-line p-8 text-center text-sm text-muted">
-          No funding sources have been created yet.
+          No Funding Sources have been created yet.
         </div>
       ) : null}
 
@@ -507,7 +507,7 @@ export default function BudgetDashboardPage() {
             Unassigned Pending Payments
           </p>
           <h3 className="mt-3 text-2xl font-semibold">
-            Not yet assigned to funding sources
+            Not yet assigned to Funding Sources
           </h3>
           {pendingMerchantTotals.length === 0 ? (
             <div className="portal-card mt-6 rounded-md border border-dashed border-line p-6 text-sm text-muted">
