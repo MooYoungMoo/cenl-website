@@ -674,80 +674,112 @@ export type PortalLink = {
   icon: LucideIcon;
 };
 
-export const portalLinks: PortalLink[] = [
+export type PortalNavigationSection = {
+  title: string;
+  description?: string;
+  links: PortalLink[];
+};
+
+export const portalNavigationSections: PortalNavigationSection[] = [
   {
-    href: "/portal",
-    label: "Portal Home",
-    description: "Review the lab payment workflow and portal tools.",
-    icon: Gauge,
+    title: "Portal",
+    links: [
+      {
+        href: "/portal",
+        label: "Portal Home",
+        description: "Review the lab payment workflow and portal tools.",
+        icon: Gauge,
+      },
+    ],
   },
   {
-    href: "/portal/purchase-request",
-    label: "Purchase Request",
-    description: "Submit merchant-based requests as Pending Payment items.",
-    icon: ClipboardList,
+    title: "Payment & Budget",
+    links: [
+      {
+        href: "/portal/purchase-request",
+        label: "Purchase Request",
+        description: "Submit merchant-based requests as Pending Payment items.",
+        icon: ClipboardList,
+      },
+      {
+        href: "/portal/approval-history",
+        label: "Payment Tracker",
+        description:
+          "Track merchant-based pending payments and mark items as paid.",
+        icon: FolderKanban,
+      },
+      {
+        href: "/portal/budget-dashboard",
+        label: "Budget Dashboard",
+        description: "Monitor funding source budgets and paid expenses.",
+        icon: Wallet,
+      },
+    ],
   },
   {
-    href: "/portal/approval-history",
-    label: "Payment Tracker",
-    description: "Review Pending Payment items by merchant and mark them Paid.",
-    icon: FolderKanban,
+    title: "Website Management",
+    description: "Manage public website content without editing code.",
+    links: [
+      {
+        href: "/portal/home",
+        label: "Home",
+        description: "Manage homepage hero and section headings.",
+        icon: Sparkles,
+      },
+      {
+        href: "/portal/research",
+        label: "Research",
+        description: "Manage public research topic sections and images.",
+        icon: Microscope,
+      },
+      {
+        href: "/portal/members",
+        label: "Members",
+        description: "Manage current member and alumni profile cards.",
+        icon: Users,
+      },
+      {
+        href: "/portal/pi",
+        label: "PI Profile",
+        description: "Manage the public principal investigator profile.",
+        icon: UserRound,
+      },
+      {
+        href: "/portal/publications",
+        label: "Publications",
+        description: "Manage publication records, visibility, and thumbnails.",
+        icon: FileText,
+      },
+      {
+        href: "/portal/news",
+        label: "News",
+        description: "Manage news posts, visibility, and image galleries.",
+        icon: Newspaper,
+      },
+      {
+        href: "/portal/contact",
+        label: "Contact",
+        description: "Manage recruiting and lab contact page content.",
+        icon: Mail,
+      },
+    ],
   },
   {
-    href: "/portal/budget-dashboard",
-    label: "Budget Dashboard",
-    description: "Monitor Funding Source budgets using paid request totals.",
-    icon: Wallet,
-  },
-  {
-    href: "/portal/publications",
-    label: "Publications",
-    description: "Manage publication records, visibility, and thumbnails.",
-    icon: FileText,
-  },
-  {
-    href: "/portal/news",
-    label: "News",
-    description: "Manage news posts, visibility, and image galleries.",
-    icon: Newspaper,
-  },
-  {
-    href: "/portal/members",
-    label: "Members",
-    description: "Manage current member and alumni profile cards.",
-    icon: Users,
-  },
-  {
-    href: "/portal/research",
-    label: "Research",
-    description: "Manage public research topic sections and images.",
-    icon: Microscope,
-  },
-  {
-    href: "/portal/contact",
-    label: "Contact",
-    description: "Manage recruiting and lab contact page content.",
-    icon: Mail,
-  },
-  {
-    href: "/portal/home",
-    label: "Home",
-    description: "Manage homepage hero and section headings.",
-    icon: Sparkles,
-  },
-  {
-    href: "/portal/pi",
-    label: "PI Profile",
-    description: "Manage the public principal investigator profile.",
-    icon: UserRound,
-  },
-  {
-    href: "/portal/admin",
-    label: "Admin",
-    description: "Manage merchants, Funding Sources, and portal operations.",
-    icon: ShieldCheck,
+    title: "System Admin",
+    links: [
+      {
+        href: "/portal/admin",
+        label: "Admin",
+        description: "Manage users, Funding Sources, Merchants, and settings.",
+        icon: ShieldCheck,
+      },
+    ],
   },
 ];
+
+export const portalLinks: PortalLink[] = portalNavigationSections.flatMap(
+  (section) => section.links,
+);
 
 export const purchaseRequestFields: string[] = [
   "Item or Service",
