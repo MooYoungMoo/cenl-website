@@ -579,13 +579,18 @@ export default function AdminPage() {
       nextRole === "student";
 
     if (isSelfDowngrade) {
-      const confirmed = window.confirm(
-        "You are changing your own role from professor/admin to student. You may lose access to Admin tools. Continue?",
-      );
+      setErrorMessage("You cannot remove your own professor/admin access.");
+      return;
+    }
 
-      if (!confirmed) {
-        return;
-      }
+    const professorCount = profiles.filter(
+      (nextProfile) => nextProfile.role?.toLowerCase() === "professor",
+    ).length;
+    const removesProfessorRole = currentRole === "professor" && nextRole !== "professor";
+
+    if (removesProfessorRole && professorCount <= 1) {
+      setErrorMessage("At least one professor account must remain.");
+      return;
     }
 
     setSaving(true);
@@ -694,7 +699,7 @@ export default function AdminPage() {
     setSuccessMessage("");
 
     const confirmed = window.confirm(
-      "Remove this project admin from the Funding Source?",
+      "Are you sure you want to remove this project admin assignment? The user will no longer manage this Funding Source.",
     );
 
     if (!confirmed) {
@@ -723,6 +728,15 @@ export default function AdminPage() {
   const handleFinishFundingSource = async (sourceId: string) => {
     setErrorMessage("");
     setSuccessMessage("");
+
+    const confirmed = window.confirm(
+      "Are you sure you want to finish this funding source? It will move to inactive/finished sources.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setSaving(true);
 
     const { error } = await supabase
@@ -780,7 +794,7 @@ export default function AdminPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this unused funding source? This cannot be undone.",
+      "Are you sure you want to delete this unused funding source? This cannot be undone.",
     );
 
     if (!confirmed) {
@@ -891,7 +905,7 @@ export default function AdminPage() {
 
   const handleDeactivateMerchant = async (merchantId: string) => {
     const confirmed = window.confirm(
-      "Deactivate this merchant? Existing purchase requests will remain unchanged.",
+      "Are you sure you want to deactivate this merchant? It will no longer appear in the Purchase Request selector, but linked purchase requests will remain.",
     );
 
     if (!confirmed) {
@@ -951,7 +965,7 @@ export default function AdminPage() {
     }
 
     const confirmed = window.confirm(
-      "Delete this inactive unused merchant? This cannot be undone.",
+      "Are you sure you want to delete this inactive unused merchant? This cannot be undone.",
     );
 
     if (!confirmed) {
@@ -998,7 +1012,7 @@ export default function AdminPage() {
     }
 
     const confirmed = window.confirm(
-      `This will move all purchase requests from ${mergeSourceMerchant.name} to ${mergeTargetMerchant.name}. This cannot be automatically undone.`,
+      `Are you sure you want to merge this merchant? Linked purchase requests will move from ${mergeSourceMerchant.name} to ${mergeTargetMerchant.name}. This cannot be automatically undone.`,
     );
 
     if (!confirmed) {
@@ -1064,6 +1078,28 @@ export default function AdminPage() {
             Edit profile labels and portal roles. Account creation and email
             invitations are intentionally not implemented yet.
           </p>
+          <div className="mt-3 grid gap-1 text-xs leading-6 text-muted">
+            <p>
+              <span className="font-semibold text-foreground">professor:</span>{" "}
+              Full owner. Can manage users, project admins, funding sources,
+              merchants, and all payments.
+            </p>
+            <p>
+              <span className="font-semibold text-foreground">admin:</span>{" "}
+              Global lab administrator. Can manage portal operations, but
+              professor should remain the final owner.
+            </p>
+            <p>
+              <span className="font-semibold text-foreground">student:</span>{" "}
+              Can submit purchase requests and manage their own pending
+              requests.
+            </p>
+            <p>
+              Project-specific admins are assigned under each Funding Source.
+              Project admin assignment does not require changing the user role
+              to admin.
+            </p>
+          </div>
         </div>
         <button
           type="button"

@@ -537,7 +537,7 @@ export function PurchaseRequestPanel() {
     }
 
     const confirmed = window.confirm(
-      `Delete pending request "${request.item_name}"? This cannot be undone.`,
+      `Are you sure you want to delete this Pending Payment request "${request.item_name}"? This cannot be undone.`,
     );
 
     if (!confirmed) {

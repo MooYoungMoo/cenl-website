@@ -491,7 +491,7 @@ export default function PaymentTrackerPage() {
     }
 
     const confirmed = window.confirm(
-      `Undo payment for "${request.item_name}"? This will move it back to pending payment.`,
+      `Are you sure you want to undo this payment for "${request.item_name}"? It will return the request to Pending Payment.`,
     );
 
     if (!confirmed) {
