@@ -125,7 +125,7 @@ export default function HomePage() {
               >
                 <p className="text-sm font-medium text-brand">{item.date}</p>
                 <h3 className="mt-3 text-xl font-semibold">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted">{item.description}</p>
+                <p className="mt-3 text-sm leading-7 text-muted">{item.summary}</p>
                 <Link
                   href={`/news/${item.slug}`}
                   className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand"

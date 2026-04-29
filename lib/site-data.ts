@@ -512,16 +512,37 @@ export type NewsCategory =
   | "research updates"
   | "general lab news";
 
+export type NewsCategoryFilter = NewsCategory | "all";
+
+export type NewsCategoryOption = {
+  label: string;
+  value: NewsCategoryFilter;
+};
+
+export type NewsGalleryImage = {
+  label: string;
+  caption?: string;
+};
+
 export type NewsItem = {
   slug: string;
+  title: string;
   date: string;
   category: NewsCategory;
-  title: string;
-  description: string;
+  summary: string;
   body: string[];
-  imageLabel: string;
-  galleryLabels: string[];
+  representativeImage: string;
+  galleryImages: NewsGalleryImage[];
 };
+
+export const newsCategoryOptions: NewsCategoryOption[] = [
+  { label: "All", value: "all" },
+  { label: "Student Awards", value: "student awards" },
+  { label: "PI Awards", value: "PI awards" },
+  { label: "Group Events", value: "group events" },
+  { label: "Research Updates", value: "research updates" },
+  { label: "General Lab News", value: "general lab news" },
+];
 
 export const newsItems: NewsItem[] = [
   {
@@ -529,70 +550,90 @@ export const newsItems: NewsItem[] = [
     date: "April 18, 2026",
     category: "student awards",
     title: "CENL student receives recognition for sensor poster presentation",
-    description:
+    summary:
       "A student presentation on nanomaterial sensor arrays was recognized at a departmental research showcase.",
     body: [
       "This placeholder story highlights student research momentum in the lab. The final version can include the student's name, event details, award title, and presentation topic.",
       "The project focused on improving how electronic nose systems identify complex vapor patterns using tailored sensing materials and interpretable analysis.",
     ],
-    imageLabel: "Award photo placeholder",
-    galleryLabels: ["Poster session placeholder", "Award ceremony placeholder", "Lab celebration placeholder"],
+    representativeImage: "Award photo placeholder",
+    galleryImages: [
+      { label: "Poster session placeholder", caption: "Optional poster-session caption placeholder." },
+      { label: "Award ceremony placeholder", caption: "Optional award-photo caption placeholder." },
+      { label: "Lab celebration placeholder", caption: "Optional group-photo caption placeholder." },
+    ],
   },
   {
     slug: "pi-recognition-chemoelectronic-research",
     date: "March 27, 2026",
     category: "PI awards",
     title: "PI recognized for contributions to chemoelectronic materials research",
-    description:
+    summary:
       "The lab celebrates a faculty milestone connected to chemical sensing and nanomaterial device research.",
     body: [
       "This article is a placeholder for PI award news. It can later include the official award name, awarding organization, and research significance.",
       "CENL's research vision connects fundamental material design with practical sensing systems for environmental, biomedical, and industrial applications.",
     ],
-    imageLabel: "Faculty award placeholder",
-    galleryLabels: ["Award venue placeholder", "Faculty portrait placeholder", "Research highlight placeholder"],
+    representativeImage: "Faculty award placeholder",
+    galleryImages: [
+      { label: "Award venue placeholder", caption: "Optional venue caption placeholder." },
+      { label: "Faculty portrait placeholder", caption: "Optional portrait caption placeholder." },
+      { label: "Research highlight placeholder", caption: "Optional research-image caption placeholder." },
+    ],
   },
   {
     slug: "spring-group-workshop",
     date: "February 14, 2026",
     category: "group events",
     title: "Spring workshop brings lab members together for research planning",
-    description:
+    summary:
       "CENL held a group workshop to review active projects and plan upcoming experiments.",
     body: [
       "The group event page can later include photos, agenda notes, and project planning outcomes.",
       "The workshop emphasized shared experimental standards, reproducible measurement workflows, and mentoring across student cohorts.",
     ],
-    imageLabel: "Group event placeholder",
-    galleryLabels: ["Workshop discussion placeholder", "Team planning placeholder", "Group photo placeholder"],
+    representativeImage: "Group event placeholder",
+    galleryImages: [
+      { label: "Workshop discussion placeholder", caption: "Optional discussion caption placeholder." },
+      { label: "Team planning placeholder", caption: "Optional planning caption placeholder." },
+      { label: "Group photo placeholder", caption: "Optional group-photo caption placeholder." },
+    ],
   },
   {
     slug: "electronic-nose-platform-update",
     date: "January 30, 2026",
     category: "research updates",
     title: "Electronic nose platform prototype enters a new testing phase",
-    description:
+    summary:
       "The lab is preparing placeholder evaluation workflows for portable chemical sensing prototypes.",
     body: [
       "This research update summarizes progress on a portable electronic nose platform. Details can later be replaced with measured performance, device photos, and collaborator notes.",
       "The current interface is designed to make future technical updates easy to publish without adding a database yet.",
     ],
-    imageLabel: "Prototype placeholder",
-    galleryLabels: ["Device bench placeholder", "Sensor module placeholder", "Measurement setup placeholder"],
+    representativeImage: "Prototype placeholder",
+    galleryImages: [
+      { label: "Device bench placeholder", caption: "Optional device-bench caption placeholder." },
+      { label: "Sensor module placeholder", caption: "Optional sensor-module caption placeholder." },
+      { label: "Measurement setup placeholder", caption: "Optional measurement caption placeholder." },
+    ],
   },
   {
     slug: "cenl-website-launch",
     date: "January 8, 2026",
     category: "general lab news",
     title: "CENL launches a refreshed frontend website structure",
-    description:
+    summary:
       "The new website organizes research, members, publications, news, contact information, and portal placeholders.",
     body: [
       "This launch note marks the first frontend-only version of the CENL website.",
       "Authentication, databases, purchasing workflows, and administrative data integrations are intentionally left for later phases.",
     ],
-    imageLabel: "Website placeholder",
-    galleryLabels: ["Homepage preview placeholder", "News editor placeholder", "Publication layout placeholder"],
+    representativeImage: "Website placeholder",
+    galleryImages: [
+      { label: "Homepage preview placeholder", caption: "Optional homepage preview caption placeholder." },
+      { label: "News editor placeholder", caption: "Optional future-admin caption placeholder." },
+      { label: "Publication layout placeholder", caption: "Optional publications caption placeholder." },
+    ],
   },
 ];
 

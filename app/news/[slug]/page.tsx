@@ -41,9 +41,12 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
         <h1 className="mt-6 text-4xl font-semibold leading-tight md:text-6xl">
           {item.title}
         </h1>
-        <p className="mt-6 text-lg leading-8 text-muted">{item.description}</p>
+        <p className="mt-6 text-lg leading-8 text-muted">{item.summary}</p>
       </div>
-      <VisualPlaceholder label={item.imageLabel} className="mt-10 min-h-[420px]" />
+      <VisualPlaceholder
+        label={item.representativeImage}
+        className="mt-10 min-h-[420px]"
+      />
       <section className="mt-10 grid gap-10 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5 text-base leading-8 text-muted">
           {item.body.map((paragraph) => (
@@ -55,12 +58,18 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
             Photo Gallery
           </p>
           <div className="mt-4 grid gap-3">
-            {item.galleryLabels.map((label) => (
-              <VisualPlaceholder
-                key={label}
-                label={label}
-                className="min-h-32 rounded-md"
-              />
+            {item.galleryImages.map((image) => (
+              <div key={image.label}>
+                <VisualPlaceholder
+                  label={image.label}
+                  className="min-h-32 rounded-md"
+                />
+                {image.caption ? (
+                  <p className="mt-2 text-xs leading-5 text-muted">
+                    {image.caption}
+                  </p>
+                ) : null}
+              </div>
             ))}
           </div>
         </aside>
