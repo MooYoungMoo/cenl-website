@@ -136,8 +136,10 @@ export type ResearchTopic = {
   slug: string;
   title: string;
   summary: string;
+  subtitle?: string;
   description: string;
   points: string[];
+  imageUrl?: string;
   imageLabel: string;
   icon: LucideIcon;
 };
@@ -714,6 +716,12 @@ export const portalLinks: PortalLink[] = [
     label: "Members",
     description: "Manage current member and alumni profile cards.",
     icon: Users,
+  },
+  {
+    href: "/portal/research",
+    label: "Research",
+    description: "Manage public research topic sections and images.",
+    icon: Microscope,
   },
   {
     href: "/portal/admin",
