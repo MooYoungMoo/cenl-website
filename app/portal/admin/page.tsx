@@ -55,6 +55,23 @@ type MerchantUsage = {
   merchant_id: string | null;
 };
 
+type ManagedProfile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+  affiliation: string | null;
+  position: string | null;
+  created_at: string | null;
+};
+
+type ManagedProfileForm = {
+  fullName: string;
+  role: string;
+  affiliation: string;
+  position: string;
+};
+
 const emptyFundingForm: FundingSourceForm = {
   name: "",
   fundingAgency: "",
@@ -109,18 +126,32 @@ function toFundingForm(source: FundingSource): FundingSourceForm {
   };
 }
 
+function toProfileForm(profile: ManagedProfile): ManagedProfileForm {
+  return {
+    fullName: profile.full_name ?? "",
+    role: profile.role ?? "student",
+    affiliation: profile.affiliation ?? "",
+    position: profile.position ?? "",
+  };
+}
+
 function parseBudget(value: string) {
   return value.trim() ? Number(value) : 0;
 }
 
 export default function AdminPage() {
   const [role, setRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [usedFundingSourceIds, setUsedFundingSourceIds] = useState<string[]>(
     [],
   );
   const [usedMerchantIds, setUsedMerchantIds] = useState<string[]>([]);
   const [merchantReviews, setMerchantReviews] = useState<MerchantReview[]>([]);
+  const [profiles, setProfiles] = useState<ManagedProfile[]>([]);
+  const [profileDrafts, setProfileDrafts] = useState<
+    Record<string, ManagedProfileForm>
+  >({});
   const [fundingForm, setFundingForm] =
     useState<FundingSourceForm>(emptyFundingForm);
   const [fundingDrafts, setFundingDrafts] = useState<
@@ -169,6 +200,16 @@ export default function AdminPage() {
   const inactiveMerchants = useMemo(
     () => merchantReviews.filter((merchant) => merchant.is_active === false),
     [merchantReviews],
+  );
+
+  const sortedProfiles = useMemo(
+    () =>
+      [...profiles].sort((first, second) =>
+        (first.full_name || first.email || "").localeCompare(
+          second.full_name || second.email || "",
+        ),
+      ),
+    [profiles],
   );
 
   const mergeSourceMerchant = useMemo(
@@ -289,6 +330,32 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadProfiles = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role, affiliation, position, created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setProfiles([]);
+      setProfileDrafts({});
+      setErrorMessage(error.message);
+      return;
+    }
+
+    const nextProfiles = (data ?? []) as ManagedProfile[];
+    setProfiles(nextProfiles);
+    setProfileDrafts(
+      nextProfiles.reduce<Record<string, ManagedProfileForm>>(
+        (accumulator, profile) => {
+          accumulator[profile.id] = toProfileForm(profile);
+          return accumulator;
+        },
+        {},
+      ),
+    );
+  }, []);
+
   const loadAdminData = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
@@ -300,10 +367,13 @@ export default function AdminPage() {
 
     if (userError || !user) {
       setRole(null);
+      setCurrentUserId(null);
       setErrorMessage("Please sign in again before using Admin tools.");
       setLoading(false);
       return;
     }
+
+    setCurrentUserId(user.id);
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -323,11 +393,15 @@ export default function AdminPage() {
     setRole(nextRole);
 
     if (canManage(nextRole)) {
-      await Promise.all([loadFundingSources(), loadMerchantReviews()]);
+      await Promise.all([
+        loadFundingSources(),
+        loadMerchantReviews(),
+        loadProfiles(),
+      ]);
     }
 
     setLoading(false);
-  }, [loadFundingSources, loadMerchantReviews]);
+  }, [loadFundingSources, loadMerchantReviews, loadProfiles]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -355,6 +429,20 @@ export default function AdminPage() {
       ...current,
       [sourceId]: {
         ...current[sourceId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateProfileDraft = (
+    profileId: string,
+    field: keyof ManagedProfileForm,
+    value: string,
+  ) => {
+    setProfileDrafts((current) => ({
+      ...current,
+      [profileId]: {
+        ...current[profileId],
         [field]: value,
       },
     }));
@@ -408,6 +496,62 @@ export default function AdminPage() {
     setFundingForm(emptyFundingForm);
     setSaving(false);
     await loadFundingSources();
+  };
+
+  const handleUpdateProfile = async (profile: ManagedProfile) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const draft = profileDrafts[profile.id];
+
+    if (!draft) {
+      return;
+    }
+
+    const nextRole = draft.role.trim().toLowerCase();
+
+    if (!["student", "professor", "admin"].includes(nextRole)) {
+      setErrorMessage("Role must be student, professor, or admin.");
+      return;
+    }
+
+    const currentRole = (profile.role ?? "").toLowerCase();
+    const isSelfDowngrade =
+      profile.id === currentUserId &&
+      (currentRole === "professor" || currentRole === "admin") &&
+      nextRole === "student";
+
+    if (isSelfDowngrade) {
+      const confirmed = window.confirm(
+        "You are changing your own role from professor/admin to student. You may lose access to Admin tools. Continue?",
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: draft.fullName.trim() || null,
+        role: nextRole,
+        affiliation: draft.affiliation.trim() || null,
+        position: draft.position.trim() || null,
+      })
+      .eq("id", profile.id);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("User profile updated.");
+    setSaving(false);
+    await loadProfiles();
   };
 
   const handleUpdateFundingSource = async (sourceId: string) => {
@@ -777,6 +921,124 @@ export default function AdminPage() {
     await loadMerchantReviews();
   };
 
+  const renderUserManagement = () => (
+    <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+            User Management
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold">Portal users</h3>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Edit profile labels and portal roles. Account creation and email
+            invitations are intentionally not implemented yet.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadProfiles()}
+          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+        >
+          Refresh Users
+        </button>
+      </div>
+
+      {sortedProfiles.length === 0 ? (
+        <div className="mt-5 rounded-md border border-dashed border-line p-5 text-sm text-muted">
+          No profiles are available.
+        </div>
+      ) : null}
+
+      {sortedProfiles.length > 0 ? (
+        <div className="mt-5 overflow-x-auto rounded-md border border-line bg-white/60">
+          <div className="min-w-[980px] divide-y divide-line">
+            <div className="grid grid-cols-[1.1fr_1.2fr_0.8fr_1fr_1fr_0.8fr_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+              <span>Name</span>
+              <span>Email</span>
+              <span>Role</span>
+              <span>Affiliation</span>
+              <span>Position</span>
+              <span>Created</span>
+              <span className="text-right">Action</span>
+            </div>
+            {sortedProfiles.map((profile) => {
+              const draft = profileDrafts[profile.id] ?? toProfileForm(profile);
+
+              return (
+                <div
+                  key={profile.id}
+                  className="grid grid-cols-[1.1fr_1.2fr_0.8fr_1fr_1fr_0.8fr_auto] gap-3 px-3 py-2 text-sm"
+                >
+                  <input
+                    value={draft.fullName}
+                    onChange={(event) =>
+                      updateProfileDraft(
+                        profile.id,
+                        "fullName",
+                        event.target.value,
+                      )
+                    }
+                    className="min-w-0 rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-brand"
+                    placeholder="Full name"
+                  />
+                  <p className="truncate py-1.5 text-xs text-muted">
+                    {profile.email ?? "TBD"}
+                  </p>
+                  <select
+                    value={draft.role}
+                    onChange={(event) =>
+                      updateProfileDraft(profile.id, "role", event.target.value)
+                    }
+                    className="rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-brand"
+                  >
+                    <option value="student">student</option>
+                    <option value="professor">professor</option>
+                    <option value="admin">admin</option>
+                  </select>
+                  <input
+                    value={draft.affiliation}
+                    onChange={(event) =>
+                      updateProfileDraft(
+                        profile.id,
+                        "affiliation",
+                        event.target.value,
+                      )
+                    }
+                    className="min-w-0 rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-brand"
+                    placeholder="Affiliation"
+                  />
+                  <input
+                    value={draft.position}
+                    onChange={(event) =>
+                      updateProfileDraft(
+                        profile.id,
+                        "position",
+                        event.target.value,
+                      )
+                    }
+                    className="min-w-0 rounded-md border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-brand"
+                    placeholder="Position"
+                  />
+                  <p className="py-1.5 text-xs text-muted">
+                    {formatDate(profile.created_at)}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void handleUpdateProfile(profile)}
+                    className="rounded-md border border-brand/30 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                  >
+                    Save
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+
   const renderFundingMetadata = (source: FundingSource) => {
     const metadata = [
       source.funding_agency ? `Agency: ${source.funding_agency}` : "",
@@ -954,6 +1216,8 @@ export default function AdminPage() {
 
       {!loading && userCanManage ? (
         <div className="mt-8 grid gap-8">
+          {renderUserManagement()}
+
           <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
               Funding Sources
