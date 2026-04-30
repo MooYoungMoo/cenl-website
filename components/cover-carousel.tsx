@@ -12,10 +12,10 @@ function CoverPublicationCard({
   publication: PublicationItem;
 }) {
   return (
-    <article className="relative min-w-[7.5rem] snap-start overflow-hidden rounded-md border border-line bg-white shadow-sm sm:min-w-[8.5rem] lg:min-w-[9.5rem]">
+    <article className="flex min-w-[7.5rem] snap-start flex-col overflow-hidden rounded-md border border-line bg-white shadow-sm sm:min-w-[8.5rem] lg:min-w-[9.5rem]">
       {publication.imageUrl ? (
         <div
-          className="aspect-[210/297] bg-cover bg-center"
+          className="aspect-[210/297] shrink-0 bg-contain bg-top bg-no-repeat"
           style={{ backgroundImage: `url(${publication.imageUrl})` }}
           role="img"
           aria-label={publication.imageLabel}
@@ -23,14 +23,18 @@ function CoverPublicationCard({
       ) : (
         <VisualPlaceholder
           label="Cover publication placeholder"
-          className="aspect-[210/297] min-h-0 rounded-none"
+          className="aspect-[210/297] min-h-0 shrink-0 rounded-none"
         />
       )}
-      {publication.coverLabel ? (
-        <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-md bg-white/90 px-2 py-1 text-[0.65rem] font-semibold text-brand shadow-sm backdrop-blur">
-          {publication.coverLabel}
-        </span>
-      ) : null}
+      <div className="mt-auto flex min-h-8 items-center border-t border-line/70 px-2 py-1.5">
+        {publication.coverLabel ? (
+          <span className="line-clamp-1 text-[0.65rem] font-semibold text-brand">
+            {publication.coverLabel}
+          </span>
+        ) : (
+          <span className="sr-only">No cover label</span>
+        )}
+      </div>
     </article>
   );
 }

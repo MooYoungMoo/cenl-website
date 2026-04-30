@@ -87,6 +87,14 @@ export type PatentItem = {
   title: string;
   inventors: string;
   status: string;
+  patentNumber?: string | null;
+  applicationNumber?: string | null;
+  country?: string | null;
+  filingDate?: string | null;
+  publicationDate?: string | null;
+  registrationDate?: string | null;
+  assignee?: string | null;
+  description?: string | null;
 };
 
 export type ContactCard = {
@@ -761,6 +769,12 @@ export const portalNavigationSections: PortalNavigationSection[] = [
         label: "Publications",
         description: "Manage publication records, visibility, and thumbnails.",
         icon: FileText,
+      },
+      {
+        href: "/portal/patents",
+        label: "Patents",
+        description: "Manage patent and invention disclosure records.",
+        icon: ScrollText,
       },
       {
         href: "/portal/news",
