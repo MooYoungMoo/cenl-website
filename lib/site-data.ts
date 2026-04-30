@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Gauge,
   GraduationCap,
+  History,
   Mail,
   Microscope,
   Newspaper,
@@ -774,6 +775,12 @@ export const portalNavigationSections: PortalNavigationSection[] = [
   {
     title: "System Admin",
     links: [
+      {
+        href: "/portal/activity-log",
+        label: "Activity Log",
+        description: "Review recent payment and admin changes.",
+        icon: History,
+      },
       {
         href: "/portal/admin",
         label: "Admin",

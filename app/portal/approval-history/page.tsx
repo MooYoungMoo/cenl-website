@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalShell } from "@/components/portal-shell";
+import { logPortalActivity } from "@/lib/portal-activity";
 import { supabase } from "@/lib/supabase/client";
 
 type CostCategory = "materials" | "activities";
@@ -463,6 +464,35 @@ export default function PaymentTrackerPage() {
       return;
     }
 
+    const selectedRequests = requests.filter((request) =>
+      selectedRequestIds.includes(request.id),
+    );
+    const selectedFundingSource = fundingSourceMap[selectedFundingSourceId];
+    const merchantNames = Array.from(
+      new Set(
+        selectedRequests.map((request) =>
+          getRequestMerchantName(request, merchantMap),
+        ),
+      ),
+    );
+
+    await logPortalActivity({
+      action: "mark_as_paid",
+      entityType: "purchase_request",
+      entityId: selectedRequestIds.join(","),
+      summary: `Marked ${selectedRequestIds.length} purchase request${
+        selectedRequestIds.length === 1 ? "" : "s"
+      } as paid using ${selectedFundingSource?.name ?? "a Funding Source"}.`,
+      metadata: {
+        request_ids: selectedRequestIds,
+        funding_source_id: selectedFundingSourceId,
+        funding_source_name: selectedFundingSource?.name ?? null,
+        merchant_names: merchantNames,
+        total_amount: getGroupTotal(selectedRequests),
+        payment_note: trimmedNote || null,
+      },
+    });
+
     setSuccessMessage("Selected Pending Payment items were marked as Paid.");
     setSelectedRequestIds([]);
     setPaymentNote("");
@@ -514,6 +544,25 @@ export default function PaymentTrackerPage() {
       setUndoingRequestId(null);
       return;
     }
+
+    await logPortalActivity({
+      action: "undo_payment",
+      entityType: "purchase_request",
+      entityId: request.id,
+      summary: `Undid payment for ${request.item_name}.`,
+      metadata: {
+        request_id: request.id,
+        item_name: request.item_name,
+        merchant: getRequestMerchantName(request, merchantMap),
+        funding_source_id: request.funding_source_id,
+        funding_source_name: request.funding_source_id
+          ? fundingSourceMap[request.funding_source_id]?.name ?? null
+          : null,
+        paid_at: request.paid_at,
+        amount: request.estimated_cost,
+        currency: request.currency,
+      },
+    });
 
     setSuccessMessage("Payment was undone and moved back to pending.");
     setUndoingRequestId(null);

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { logPortalActivity } from "@/lib/portal-activity";
 import { supabase } from "@/lib/supabase/client";
 
 type CostCategory = "materials" | "activities";
@@ -545,6 +546,24 @@ export function PurchaseRequestPanel() {
     }
 
     setCancelingRequestId(request.id);
+
+    await logPortalActivity({
+      action: "delete_purchase_request",
+      entityType: "purchase_request",
+      entityId: request.id,
+      summary: `Deleted pending purchase request: ${request.item_name}.`,
+      metadata: {
+        item_name: request.item_name,
+        merchant: getRequestMerchantName(request),
+        amount: request.estimated_cost,
+        currency: request.currency,
+        purpose: request.purpose,
+        status: request.status,
+        cost_category: request.cost_category,
+        item_url: request.item_url,
+        payment_note: request.payment_note,
+      },
+    });
 
     const { error } = await supabase
       .from("purchase_requests")

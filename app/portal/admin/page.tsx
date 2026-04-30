@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { PortalShell } from "@/components/portal-shell";
+import { logPortalActivity } from "@/lib/portal-activity";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -286,6 +287,24 @@ export default function AdminPage() {
       .slice(0, 12);
   }, [mergeTargetSearch, merchantReviews]);
 
+  const getFundingSourceLabel = (sourceId: string) =>
+    fundingSources.find((source) => source.id === sourceId)?.name ??
+    "Funding Source";
+
+  const getMerchantLabel = (merchantId: string) =>
+    merchantReviews.find((merchant) => merchant.id === merchantId)?.name ??
+    "Merchant";
+
+  const getProfileLabel = (profileId: string) => {
+    const profile = profileMap[profileId];
+
+    return (
+      profile?.email ||
+      profile?.full_name ||
+      `User ${profileId.slice(0, 8)}`
+    );
+  };
+
   const loadFundingSources = useCallback(async () => {
     const [sourcesResult, usageResult] = await Promise.all([
       supabase
@@ -553,6 +572,13 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "add_funding_source",
+      entityType: "funding_source",
+      summary: `Added Funding Source: ${payload.name}.`,
+      metadata: payload,
+    });
+
     setSuccessMessage("Funding source added.");
     setFundingForm(emptyFundingForm);
     setSaving(false);
@@ -615,6 +641,23 @@ export default function AdminPage() {
       return;
     }
 
+    if (currentRole !== nextRole) {
+      await logPortalActivity({
+        action: "update_user_role",
+        entityType: "profile",
+        entityId: profile.id,
+        summary: `Changed user role for ${
+          profile.email ?? profile.full_name ?? profile.id
+        } from ${currentRole || "unknown"} to ${nextRole}.`,
+        metadata: {
+          previous_role: currentRole || null,
+          new_role: nextRole,
+          profile_id: profile.id,
+          email: profile.email,
+        },
+      });
+    }
+
     setSuccessMessage("User profile updated.");
     setSaving(false);
     await loadProfiles();
@@ -649,6 +692,18 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "edit_funding_source",
+      entityType: "funding_source",
+      entityId: sourceId,
+      summary: `Edited Funding Source: ${payload.name}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        previous_name: getFundingSourceLabel(sourceId),
+        ...payload,
+      },
+    });
 
     setSuccessMessage("Funding source updated.");
     setSaving(false);
@@ -689,6 +744,21 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "add_project_admin",
+      entityType: "funding_source_manager",
+      entityId: sourceId,
+      summary: `Assigned ${getProfileLabel(userId)} as project admin for ${getFundingSourceLabel(
+        sourceId,
+      )}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        funding_source_name: getFundingSourceLabel(sourceId),
+        user_id: userId,
+        user_label: getProfileLabel(userId),
+      },
+    });
+
     setSuccessMessage("Project admin assigned to Funding Source.");
     setManagerUserDrafts((current) => ({ ...current, [sourceId]: "" }));
     setSaving(false);
@@ -724,6 +794,21 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "remove_project_admin",
+      entityType: "funding_source_manager",
+      entityId: sourceId,
+      summary: `Removed ${getProfileLabel(userId)} as project admin for ${getFundingSourceLabel(
+        sourceId,
+      )}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        funding_source_name: getFundingSourceLabel(sourceId),
+        user_id: userId,
+        user_label: getProfileLabel(userId),
+      },
+    });
+
     setSuccessMessage("Project admin removed from Funding Source.");
     setSaving(false);
     await loadFundingSourceManagers();
@@ -757,6 +842,17 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "finish_funding_source",
+      entityType: "funding_source",
+      entityId: sourceId,
+      summary: `Finished Funding Source: ${getFundingSourceLabel(sourceId)}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        funding_source_name: getFundingSourceLabel(sourceId),
+      },
+    });
+
     setSuccessMessage("Funding source marked as finished.");
     setSaving(false);
     await loadFundingSources();
@@ -780,6 +876,17 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "reactivate_funding_source",
+      entityType: "funding_source",
+      entityId: sourceId,
+      summary: `Reactivated Funding Source: ${getFundingSourceLabel(sourceId)}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        funding_source_name: getFundingSourceLabel(sourceId),
+      },
+    });
 
     setSuccessMessage("Funding source reactivated.");
     setSaving(false);
@@ -820,6 +927,19 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "delete_funding_source",
+      entityType: "funding_source",
+      entityId: sourceId,
+      summary: `Deleted unused Funding Source: ${getFundingSourceLabel(
+        sourceId,
+      )}.`,
+      metadata: {
+        funding_source_id: sourceId,
+        funding_source_name: getFundingSourceLabel(sourceId),
+      },
+    });
+
     setSuccessMessage("Unused funding source deleted.");
     setSaving(false);
     await loadFundingSources();
@@ -842,6 +962,10 @@ export default function AdminPage() {
       setErrorMessage("Merchant name must include at least one letter or number.");
       return;
     }
+
+    const currentMerchant = merchantReviews.find(
+      (merchant) => merchant.id === merchantId,
+    );
 
     setSaving(true);
 
@@ -880,6 +1004,22 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "edit_merchant_name",
+      entityType: "merchant",
+      entityId: merchantId,
+      summary: `Edited merchant name from ${
+        currentMerchant?.name ?? "Merchant"
+      } to ${name}.`,
+      metadata: {
+        merchant_id: merchantId,
+        previous_name: currentMerchant?.name ?? null,
+        previous_normalized_name: currentMerchant?.normalized_name ?? null,
+        new_name: name,
+        new_normalized_name: normalizedName,
+      },
+    });
 
     setSuccessMessage("Merchant name and normalized name updated.");
     setSaving(false);
@@ -931,6 +1071,17 @@ export default function AdminPage() {
       return;
     }
 
+    await logPortalActivity({
+      action: "deactivate_merchant",
+      entityType: "merchant",
+      entityId: merchantId,
+      summary: `Deactivated merchant: ${getMerchantLabel(merchantId)}.`,
+      metadata: {
+        merchant_id: merchantId,
+        merchant_name: getMerchantLabel(merchantId),
+      },
+    });
+
     setSuccessMessage("Merchant deactivated.");
     setSaving(false);
     await loadMerchantReviews();
@@ -951,6 +1102,17 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "reactivate_merchant",
+      entityType: "merchant",
+      entityId: merchantId,
+      summary: `Reactivated merchant: ${getMerchantLabel(merchantId)}.`,
+      metadata: {
+        merchant_id: merchantId,
+        merchant_name: getMerchantLabel(merchantId),
+      },
+    });
 
     setSuccessMessage("Merchant reactivated.");
     setSaving(false);
@@ -990,6 +1152,19 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "delete_merchant",
+      entityType: "merchant",
+      entityId: merchantId,
+      summary: `Deleted inactive unused merchant: ${getMerchantLabel(
+        merchantId,
+      )}.`,
+      metadata: {
+        merchant_id: merchantId,
+        merchant_name: getMerchantLabel(merchantId),
+      },
+    });
 
     setSuccessMessage("Inactive unused merchant deleted.");
     setSaving(false);
@@ -1058,6 +1233,20 @@ export default function AdminPage() {
       setSaving(false);
       return;
     }
+
+    await logPortalActivity({
+      action: "merge_merchant",
+      entityType: "merchant",
+      entityId: mergeSourceMerchant.id,
+      summary: `Merged ${mergeSourceMerchant.name} into ${mergeTargetMerchant.name}.`,
+      metadata: {
+        source_merchant_id: mergeSourceMerchant.id,
+        source_merchant_name: mergeSourceMerchant.name,
+        target_merchant_id: mergeTargetMerchant.id,
+        target_merchant_name: mergeTargetMerchant.name,
+        source_note: nextNote,
+      },
+    });
 
     setSuccessMessage(
       `${mergeSourceMerchant.name} was merged into ${mergeTargetMerchant.name}.`,
