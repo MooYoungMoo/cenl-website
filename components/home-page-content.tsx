@@ -2,21 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FlaskConical, Mail } from "lucide-react";
+import { FlaskConical, Mail } from "lucide-react";
 import { LatestNewsSection } from "@/components/latest-news-section";
 import { LatestPublicationsSection } from "@/components/latest-publications-section";
-import { SectionHeading } from "@/components/section-heading";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import {
   fallbackHomeContent,
   fetchHomeContent,
   type HomePageContent,
 } from "@/lib/home";
-import {
-  homeFeatureLinks,
-  quickStats,
-  researchTopics,
-} from "@/lib/site-data";
+import { homeFeatureLinks, quickStats } from "@/lib/site-data";
 
 export function HomePageContentSection() {
   const [content, setContent] =
@@ -103,50 +98,6 @@ export function HomePageContentSection() {
       </section>
 
       <LatestPublicationsSection title={content.latestPublicationsTitle} />
-
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16">
-        <SectionHeading
-          eyebrow="Research Highlights"
-          title={content.researchHighlightTitle}
-          description={content.researchHighlightDescription}
-        />
-        <div className="mt-10 grid gap-6 lg:grid-cols-3">
-          {researchTopics.map((topic) => {
-            const Icon = topic.icon;
-            return (
-              <article
-                key={topic.slug}
-                className="elevated-card overflow-hidden border border-line bg-surface-strong"
-              >
-                <VisualPlaceholder
-                  label={topic.imageLabel}
-                  className="min-h-52 rounded-none"
-                />
-                <div className="min-w-0 p-5 sm:p-6">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-md bg-brand-soft p-2 text-brand">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <h3 className="break-words text-xl font-semibold">
-                      {topic.title}
-                    </h3>
-                  </div>
-                  <p className="mt-4 break-words text-sm leading-7 text-muted">
-                    {topic.summary}
-                  </p>
-                  <Link
-                    href="/research"
-                    className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand"
-                  >
-                    View topic
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
 
       <LatestNewsSection title={content.latestNewsTitle} />
 

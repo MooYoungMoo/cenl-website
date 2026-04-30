@@ -2,6 +2,10 @@
 
 import { useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ContributionBadge,
+  HighlightedAuthors,
+} from "@/components/publication-author-tools";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import type { PublicationItem } from "@/lib/site-data";
 
@@ -58,7 +62,7 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
           >
             {item.imageUrl ? (
               <div
-                className="min-h-36 rounded-none bg-cover bg-center sm:min-h-40"
+                className="aspect-square rounded-none bg-cover bg-center"
                 style={{ backgroundImage: `url(${item.imageUrl})` }}
                 role="img"
                 aria-label={item.imageLabel}
@@ -66,18 +70,24 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
             ) : (
               <VisualPlaceholder
                 label={item.imageLabel}
-                className="min-h-40 rounded-none"
+                className="aspect-square min-h-0 rounded-none"
               />
             )}
             <div className="min-w-0 p-5 sm:p-6">
-              <span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
-                {item.label}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
+                  {item.label}
+                </span>
+                <ContributionBadge contribution={item.labContribution} />
+              </div>
               <h3 className="mt-4 break-words text-lg font-semibold leading-snug">
                 {item.title}
               </h3>
               <p className="mt-3 break-words text-sm leading-6 text-muted">
-                {item.authors}
+                <HighlightedAuthors
+                  authors={item.authors}
+                  highlightedAuthors={item.highlightedAuthors}
+                />
               </p>
               <p className="mt-3 text-sm font-medium text-foreground">
                 {item.journal} | {item.year}

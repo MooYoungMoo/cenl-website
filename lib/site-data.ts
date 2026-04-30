@@ -424,6 +424,8 @@ export type PublicationItem = {
   imageUrl?: string;
   imageLabel: string;
   citationCount?: number | null;
+  highlightedAuthors?: string[];
+  labContribution?: string | null;
 };
 
 export const publicationItems: PublicationItem[] = [

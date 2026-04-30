@@ -439,25 +439,11 @@ export default function PortalHomeManagementPage() {
             className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
             placeholder="Latest news title"
           />
-          <input
-            value={homeForm.researchHighlightTitle}
-            onChange={(event) =>
-              updateHomeForm("researchHighlightTitle", event.target.value)
-            }
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand md:col-span-2"
-            placeholder="Research highlights title"
-          />
-          <textarea
-            value={homeForm.researchHighlightDescription}
-            onChange={(event) =>
-              updateHomeForm(
-                "researchHighlightDescription",
-                event.target.value,
-              )
-            }
-            className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand md:col-span-2"
-            placeholder="Research highlights description"
-          />
+          <p className="rounded-md border border-line bg-white/60 px-3 py-2 text-xs leading-6 text-muted md:col-span-2">
+            Research Highlights fields are preserved in the database for
+            backward compatibility, but the public homepage now directs research
+            content to the dedicated Research page.
+          </p>
           <input
             value={homeForm.heroImageUrl}
             onChange={(event) =>

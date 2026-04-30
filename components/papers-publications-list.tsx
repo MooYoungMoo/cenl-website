@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
+import {
+  ContributionBadge,
+  HighlightedAuthors,
+} from "@/components/publication-author-tools";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { fetchVisiblePublications } from "@/lib/publications";
 import { papers, type PublicationItem } from "@/lib/site-data";
@@ -12,7 +16,7 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
       <div className="grid gap-4 sm:gap-5 md:grid-cols-[120px_minmax(0,1fr)] lg:grid-cols-[140px_minmax(0,1fr)]">
         {paper.imageUrl ? (
           <div
-            className="min-h-32 rounded-md bg-cover bg-center md:min-h-28"
+            className="aspect-square rounded-md bg-cover bg-center"
             style={{ backgroundImage: `url(${paper.imageUrl})` }}
             role="img"
             aria-label={paper.imageLabel}
@@ -20,7 +24,7 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
         ) : (
           <VisualPlaceholder
             label={paper.imageLabel}
-            className="min-h-32 rounded-md"
+            className="aspect-square min-h-0 rounded-md"
           />
         )}
         <div className="min-w-0">
@@ -31,12 +35,16 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
             <span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
               {paper.label}
             </span>
+            <ContributionBadge contribution={paper.labContribution} />
           </div>
           <h2 className="mt-4 break-words text-lg font-semibold leading-7 sm:text-xl">
             {paper.title}
           </h2>
           <p className="mt-3 break-words text-sm leading-7 text-muted">
-            {paper.authors}
+            <HighlightedAuthors
+              authors={paper.authors}
+              highlightedAuthors={paper.highlightedAuthors}
+            />
           </p>
           <p className="mt-1 text-sm text-muted">
             {paper.journal} | {paper.year}

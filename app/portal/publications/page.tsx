@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { FileText, Image as ImageIcon, Plus, Search } from "lucide-react";
+import { Image as ImageIcon, Plus, Search } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
+import { getContributionLabel } from "@/components/publication-author-tools";
 import type { SupabasePublication } from "@/lib/publications";
 import { supabase } from "@/lib/supabase/client";
 
@@ -26,6 +27,8 @@ type PublicationForm = {
   doi: string;
   publicationType: string;
   imageUrl: string;
+  highlightedAuthors: string;
+  labContribution: string;
   isFeatured: boolean;
   isVisible: boolean;
   displayOrder: string;
@@ -39,13 +42,26 @@ const emptyPublicationForm: PublicationForm = {
   doi: "",
   publicationType: "Article",
   imageUrl: "",
+  highlightedAuthors: "",
+  labContribution: "none",
   isFeatured: false,
   isVisible: true,
   displayOrder: "0",
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+
+const contributionOptions = [
+  { value: "none", label: "No badge" },
+  { value: "lab_author", label: "Lab author" },
+  { value: "first_author", label: "Lab first author" },
+  { value: "corresponding_author", label: "Lab corresponding author" },
+  {
+    value: "first_and_corresponding_author",
+    label: "Lab first & corresponding author",
+  },
+];
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -63,6 +79,8 @@ function toPublicationForm(publication: PublicationRecord): PublicationForm {
     doi: publication.doi ?? "",
     publicationType: publication.publication_type ?? "Article",
     imageUrl: publication.image_url ?? "",
+    highlightedAuthors: (publication.highlighted_authors ?? []).join(", "),
+    labContribution: publication.lab_contribution || "none",
     isFeatured: publication.is_featured === true,
     isVisible: publication.is_visible !== false,
     displayOrder: String(publication.display_order ?? 0),
@@ -71,6 +89,13 @@ function toPublicationForm(publication: PublicationRecord): PublicationForm {
 
 function parseDisplayOrder(value: string) {
   return value.trim() ? Number(value) : 0;
+}
+
+function parseHighlightedAuthors(value: string) {
+  return value
+    .split(",")
+    .map((author) => author.trim())
+    .filter(Boolean);
 }
 
 function getPublicationPayload(
@@ -88,6 +113,8 @@ function getPublicationPayload(
     doi: form.doi.trim() || null,
     publication_type: form.publicationType.trim() || "Article",
     image_url: nextImageUrl,
+    highlighted_authors: parseHighlightedAuthors(form.highlightedAuthors),
+    lab_contribution: form.labContribution || "none",
     is_featured: form.isFeatured,
     is_visible: form.isVisible,
     display_order: parseDisplayOrder(form.displayOrder),
@@ -185,7 +212,7 @@ function thumbnail(publication: PublicationRecord) {
   if (publication.image_url) {
     return (
       <div
-        className="h-16 w-20 rounded-md border border-line bg-cover bg-center"
+        className="aspect-square w-16 rounded-md border border-line bg-cover bg-center"
         style={{ backgroundImage: `url(${publication.image_url})` }}
         role="img"
         aria-label={`${publication.title} thumbnail`}
@@ -194,7 +221,7 @@ function thumbnail(publication: PublicationRecord) {
   }
 
   return (
-    <div className="flex h-16 w-20 items-center justify-center rounded-md border border-dashed border-line bg-white/70 text-muted">
+    <div className="flex aspect-square w-16 items-center justify-center rounded-md border border-dashed border-line bg-white/70 text-muted">
       <ImageIcon className="h-4 w-4" />
     </div>
   );
@@ -757,6 +784,24 @@ export default function PortalPublicationsPage() {
         placeholder="DOI or DOI URL"
       />
       <input
+        value={form.highlightedAuthors}
+        onChange={(event) => onChange("highlightedAuthors", event.target.value)}
+        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-2"
+        placeholder="Highlighted authors, comma-separated"
+      />
+      <select
+        value={form.labContribution}
+        onChange={(event) => onChange("labContribution", event.target.value)}
+        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-2"
+        aria-label="Lab contribution badge"
+      >
+        {contributionOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <input
         value={form.imageUrl}
         onChange={(event) => onChange("imageUrl", event.target.value)}
         className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-2"
@@ -769,13 +814,13 @@ export default function PortalPublicationsPage() {
         <div className="mt-2 flex items-center gap-3">
           {form.imageUrl.trim() ? (
             <div
-              className="h-16 w-24 rounded-md border border-line bg-cover bg-center"
+              className="aspect-square w-16 rounded-md border border-line bg-cover bg-center"
               style={{ backgroundImage: `url(${form.imageUrl.trim()})` }}
               role="img"
               aria-label="Publication thumbnail preview"
             />
           ) : (
-            <div className="flex h-16 w-24 items-center justify-center rounded-md border border-dashed border-line text-muted">
+            <div className="flex aspect-square w-16 items-center justify-center rounded-md border border-dashed border-line text-muted">
               <ImageIcon className="h-4 w-4" />
             </div>
           )}
@@ -1054,6 +1099,15 @@ export default function PortalPublicationsPage() {
                             <p className="mt-1 line-clamp-1 text-xs text-muted">
                               {publication.authors}
                             </p>
+                            {getContributionLabel(
+                              publication.lab_contribution,
+                            ) ? (
+                              <p className="mt-1 text-xs font-semibold text-brand">
+                                {getContributionLabel(
+                                  publication.lab_contribution,
+                                )}
+                              </p>
+                            ) : null}
                           </div>
                           <p className="line-clamp-2 text-sm text-muted">
                             {publication.journal}

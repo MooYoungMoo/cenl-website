@@ -10,6 +10,8 @@ export type SupabasePublication = {
   doi: string | null;
   publication_type: string | null;
   image_url: string | null;
+  highlighted_authors: string[] | null;
+  lab_contribution: string | null;
   is_featured: boolean | null;
   is_visible: boolean | null;
   display_order: number | null;
@@ -19,7 +21,7 @@ export type SupabasePublication = {
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_featured, is_visible, display_order, created_by, created_at, updated_at";
 
 function isUrl(value: string) {
   return /^https?:\/\//i.test(value);
@@ -42,6 +44,8 @@ export function mapPublicationRecord(
     imageUrl: publication.image_url?.trim() || undefined,
     imageLabel: "Publication image placeholder",
     citationCount: null,
+    highlightedAuthors: publication.highlighted_authors ?? [],
+    labContribution: publication.lab_contribution || "none",
   };
 }
 
