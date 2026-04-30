@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { ContactContentSection } from "@/components/contact-content-section";
 import { PageHero } from "@/components/page-hero";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description:
+    "Contact and recruiting information for the ChemoElectronic Nanomaterials Lab.",
+};
 
 export default function ContactPage() {
   return (

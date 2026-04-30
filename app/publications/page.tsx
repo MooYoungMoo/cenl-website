@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CoverCarousel } from "@/components/cover-carousel";
 import { PageHero } from "@/components/page-hero";
 import { publicationCovers, publicationSections } from "@/lib/site-data";
+
+export const metadata: Metadata = {
+  title: "Publications",
+  description:
+    "Papers and patents from the ChemoElectronic Nanomaterials Lab.",
+};
 
 export default function PublicationsPage() {
   return (

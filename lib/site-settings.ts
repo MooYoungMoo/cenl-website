@@ -29,13 +29,13 @@ export type SiteSettingsContent = {
 };
 
 export const fallbackSiteSettings: SiteSettingsContent = {
-  siteName: siteMeta.fullName,
+  siteName: siteMeta.name,
   shortName: siteMeta.shortName,
   headerLabel: siteMeta.shortName,
   footerText: "ChemoElectronic Nanomaterials Lab · CENL",
-  seoTitle: "ChemoElectronic Nanomaterials Lab (CENL)",
+  seoTitle: "ChemoElectronic Nanomaterials Lab",
   seoDescription:
-    "Chemoelectronic nanomaterials, electronic nose systems, and chemical sensing research.",
+    "Chemoelectronic nanomaterials for gas sensing, electronic nose systems, and materials-based sensing platforms.",
   logoUrl: "",
   ogImageUrl: "",
 };
@@ -73,16 +73,64 @@ export async function fetchSiteSettings() {
   return data ? mapSiteSettings(data as SupabaseSiteSettings) : null;
 }
 
+function getSiteUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.startsWith("http")
+      ? configuredUrl
+      : `https://${configuredUrl}`;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return "http://localhost:3000";
+}
+
 export function buildSiteMetadata(
   settings: SiteSettingsContent = fallbackSiteSettings,
 ): Metadata {
+  const images = settings.ogImageUrl ? [settings.ogImageUrl] : undefined;
+
   return {
-    title: settings.seoTitle,
+    metadataBase: new URL(getSiteUrl()),
+    title: {
+      default: settings.seoTitle,
+      template: `%s | ${settings.shortName}`,
+    },
     description: settings.seoDescription,
+    applicationName: settings.siteName,
+    keywords: [
+      "CENL",
+      "ChemoElectronic Nanomaterials Lab",
+      "chemoelectronic nanomaterials",
+      "gas sensors",
+      "electronic nose systems",
+      "materials-based sensing",
+    ],
+    authors: [{ name: settings.siteName }],
+    creator: settings.siteName,
+    publisher: settings.siteName,
     openGraph: {
       title: settings.seoTitle,
       description: settings.seoDescription,
-      images: settings.ogImageUrl ? [settings.ogImageUrl] : undefined,
+      siteName: settings.siteName,
+      type: "website",
+      locale: "en_US",
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: settings.seoTitle,
+      description: settings.seoDescription,
+      images,
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   };
 }

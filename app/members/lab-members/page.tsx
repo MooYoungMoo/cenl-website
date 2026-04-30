@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { LabMembersSection } from "@/components/lab-members-section";
 import { PageHero } from "@/components/page-hero";
+
+export const metadata: Metadata = {
+  title: "Lab Members",
+  description:
+    "Current student and researcher profiles for the ChemoElectronic Nanomaterials Lab.",
+};
 
 export default function LabMembersPage() {
   return (

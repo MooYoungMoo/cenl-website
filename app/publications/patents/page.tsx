@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { ScrollText } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { patents } from "@/lib/site-data";
+
+export const metadata: Metadata = {
+  title: "Patents",
+  description:
+    "Patent and invention disclosure records from the ChemoElectronic Nanomaterials Lab.",
+};
 
 export default function PatentsPage() {
   return (

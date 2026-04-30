@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { memberSections } from "@/lib/site-data";
+
+export const metadata: Metadata = {
+  title: "Members",
+  description:
+    "Meet the principal investigator, current members, and alumni of the ChemoElectronic Nanomaterials Lab.",
+};
 
 export default function MembersPage() {
   return (
