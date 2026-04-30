@@ -40,7 +40,7 @@ export function LatestPublicationsSection({
   }, []);
 
   return (
-    <section className="mx-auto max-w-7xl px-6 py-16">
+    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16">
       <SectionHeading
         eyebrow="Publications"
         title={title}

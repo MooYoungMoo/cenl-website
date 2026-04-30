@@ -54,6 +54,20 @@ textarea {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 h1,
 h2,
 h3,
@@ -192,6 +206,14 @@ h6 {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(229, 245, 244, 0.72)),
     var(--surface-strong);
+}
+
+@media (max-width: 640px) {
+  .elevated-card:hover,
+  .action-button:hover,
+  .brand-mark:hover {
+    transform: none;
+  }
 }
 
 .lab-image {

@@ -8,11 +8,11 @@ import { papers, type PublicationItem } from "@/lib/site-data";
 
 function PublicationCard({ paper }: { paper: PublicationItem }) {
   return (
-    <article className="elevated-card border border-line bg-white p-6">
-      <div className="grid gap-5 md:grid-cols-[140px_1fr]">
+    <article className="elevated-card border border-line bg-white p-4 sm:p-6">
+      <div className="grid gap-4 sm:gap-5 md:grid-cols-[120px_minmax(0,1fr)] lg:grid-cols-[140px_minmax(0,1fr)]">
         {paper.imageUrl ? (
           <div
-            className="min-h-32 rounded-md bg-cover bg-center"
+            className="min-h-32 rounded-md bg-cover bg-center md:min-h-28"
             style={{ backgroundImage: `url(${paper.imageUrl})` }}
             role="img"
             aria-label={paper.imageLabel}
@@ -23,7 +23,7 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
             className="min-h-32 rounded-md"
           />
         )}
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-brand-soft p-2 text-brand">
               <FileText className="h-4 w-4" />
@@ -32,15 +32,19 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
               {paper.label}
             </span>
           </div>
-          <h2 className="mt-4 text-xl font-semibold">{paper.title}</h2>
-          <p className="mt-3 text-sm leading-7 text-muted">{paper.authors}</p>
+          <h2 className="mt-4 break-words text-lg font-semibold leading-7 sm:text-xl">
+            {paper.title}
+          </h2>
+          <p className="mt-3 break-words text-sm leading-7 text-muted">
+            {paper.authors}
+          </p>
           <p className="mt-1 text-sm text-muted">
             {paper.journal} | {paper.year}
           </p>
           {paper.doiUrl ? (
             <a
               href={paper.doiUrl}
-              className="mt-4 inline-flex text-sm font-medium text-brand transition hover:text-foreground"
+              className="mt-4 inline-flex break-all text-sm font-medium text-brand transition hover:text-foreground"
             >
               DOI: {paper.doi}
             </a>
@@ -100,7 +104,7 @@ export function PapersPublicationsList() {
   );
 
   return (
-    <section className="mx-auto max-w-7xl px-6">
+    <section className="mx-auto max-w-7xl px-4 sm:px-6">
       <div className="grid gap-8 lg:grid-cols-[180px_1fr]">
         <aside className="lg:sticky lg:top-28 lg:h-fit">
           <p className="mb-3 hidden text-sm font-semibold uppercase tracking-[0.16em] text-brand lg:block">
@@ -119,11 +123,17 @@ export function PapersPublicationsList() {
           </nav>
         </aside>
 
-        <div className="space-y-12">
+        {years.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+            No publications are available yet.
+          </div>
+        ) : null}
+
+        <div className="space-y-10 sm:space-y-12">
           {years.map((year) => (
             <section key={year} id={`year-${year}`} className="scroll-mt-28">
-              <div className="mb-5 flex items-end justify-between border-b border-line pb-3">
-                <h2 className="text-3xl font-semibold">{year}</h2>
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-2 border-b border-line pb-3">
+                <h2 className="text-2xl font-semibold sm:text-3xl">{year}</h2>
                 <p className="text-sm text-muted">
                   {papersByYear[year].length} publication
                   {papersByYear[year].length === 1 ? "" : "s"}

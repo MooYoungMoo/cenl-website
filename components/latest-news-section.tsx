@@ -42,21 +42,30 @@ export function LatestNewsSection({
 
   return (
     <section className="bg-[#eef3f6]">
-      <div className="mx-auto max-w-7xl px-6 py-16">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16">
         <SectionHeading
           eyebrow="Latest News"
           title={title}
           description="News cards highlight featured lab updates from awards, events, research, and general lab activity."
         />
-        <div className="mt-10 grid gap-6 lg:grid-cols-3">
+        {items.length === 0 ? (
+          <div className="mt-8 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+            No featured news posts are available yet.
+          </div>
+        ) : null}
+        <div className="mt-8 grid gap-5 sm:mt-10 lg:grid-cols-3">
           {items.map((item) => (
             <article
               key={item.slug}
-              className="elevated-card border border-line bg-white p-6"
+              className="elevated-card min-w-0 border border-line bg-white p-5 sm:p-6"
             >
               <p className="text-sm font-medium text-brand">{item.date}</p>
-              <h3 className="mt-3 text-xl font-semibold">{item.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-muted">{item.summary}</p>
+              <h3 className="mt-3 break-words text-xl font-semibold">
+                {item.title}
+              </h3>
+              <p className="mt-3 break-words text-sm leading-7 text-muted">
+                {item.summary}
+              </p>
               <Link
                 href={`/news/${item.slug}`}
                 className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand"

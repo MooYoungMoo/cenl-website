@@ -39,9 +39,9 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-line/70 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-[1.3fr_0.8fr_1fr]">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.3fr_0.8fr_1fr] md:py-14">
         <div className="space-y-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand">
+          <p className="break-words text-sm font-semibold uppercase tracking-[0.18em] text-brand sm:tracking-[0.28em]">
             {settings.footerText}
           </p>
           <p className="max-w-md text-sm leading-7 text-muted">

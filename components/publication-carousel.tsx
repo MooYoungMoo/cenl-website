@@ -45,6 +45,11 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+      {items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+          No featured publications are available yet.
+        </div>
+      ) : null}
       <div ref={scrollerRef} className="flex snap-x gap-5 overflow-x-auto pb-4">
         {items.map((item) => (
           <article
@@ -53,7 +58,7 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
           >
             {item.imageUrl ? (
               <div
-                className="min-h-40 rounded-none bg-cover bg-center"
+                className="min-h-36 rounded-none bg-cover bg-center sm:min-h-40"
                 style={{ backgroundImage: `url(${item.imageUrl})` }}
                 role="img"
                 aria-label={item.imageLabel}
@@ -64,14 +69,16 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
                 className="min-h-40 rounded-none"
               />
             )}
-            <div className="p-6">
+            <div className="min-w-0 p-5 sm:p-6">
               <span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
                 {item.label}
               </span>
-              <h3 className="mt-4 text-lg font-semibold leading-snug">
+              <h3 className="mt-4 break-words text-lg font-semibold leading-snug">
                 {item.title}
               </h3>
-              <p className="mt-3 text-sm leading-6 text-muted">{item.authors}</p>
+              <p className="mt-3 break-words text-sm leading-6 text-muted">
+                {item.authors}
+              </p>
               <p className="mt-3 text-sm font-medium text-foreground">
                 {item.journal} | {item.year}
               </p>

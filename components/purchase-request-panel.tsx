@@ -652,17 +652,17 @@ export function PurchaseRequestPanel() {
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Payment Request
       </p>
-      <h2 className="mt-4 text-3xl font-semibold">
+      <h2 className="mt-4 break-words text-2xl font-semibold sm:text-3xl">
         Submit a Pending Payment request
       </h2>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
+      <p className="mt-3 max-w-3xl break-words text-sm leading-7 text-muted">
         Search for an existing merchant first. If it is not listed, add a new
         merchant record so future payment tracking stays consistent.
       </p>
 
       <form
         onSubmit={handleSubmit}
-        className="portal-card mt-8 rounded-lg border border-line p-6 shadow-panel"
+        className="portal-card mt-6 rounded-lg border border-line p-4 shadow-panel sm:mt-8 sm:p-6"
       >
         <div className="grid gap-5 md:grid-cols-2">
           <div className="grid gap-2 md:col-span-2">
@@ -678,7 +678,7 @@ export function PurchaseRequestPanel() {
                 onChange={(event) =>
                   handleMerchantSearchChange(event.target.value)
                 }
-                className="w-full rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
+                className="w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
                 placeholder="Search existing merchants"
               />
 
@@ -776,7 +776,7 @@ export function PurchaseRequestPanel() {
               required
               value={form.itemName}
               onChange={(event) => updateForm("itemName", event.target.value)}
-              className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
               placeholder="e.g., Gas sensor substrate"
             />
           </label>
@@ -789,7 +789,7 @@ export function PurchaseRequestPanel() {
               onChange={(event) =>
                 updateForm("costCategory", event.target.value as CostCategory)
               }
-              className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
             >
               <option value="materials">Materials</option>
               <option value="activities">Activities</option>
@@ -807,7 +807,7 @@ export function PurchaseRequestPanel() {
               onChange={(event) =>
                 updateForm("estimatedCost", event.target.value)
               }
-              className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
               placeholder="0"
             />
           </label>
@@ -817,7 +817,7 @@ export function PurchaseRequestPanel() {
             <input
               value={form.currency}
               onChange={(event) => updateForm("currency", event.target.value)}
-              className="rounded-md border border-line bg-white px-4 py-3 text-sm uppercase outline-none transition focus:border-brand focus:shadow-sm"
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm uppercase outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
               placeholder="KRW"
             />
           </label>
@@ -828,7 +828,7 @@ export function PurchaseRequestPanel() {
               type="url"
               value={form.itemUrl}
               onChange={(event) => updateForm("itemUrl", event.target.value)}
-              className="rounded-md border border-line bg-white px-4 py-3 text-sm outline-none transition focus:border-brand focus:shadow-sm"
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
               placeholder="https://"
             />
           </label>
@@ -840,7 +840,7 @@ export function PurchaseRequestPanel() {
             required
             value={form.purpose}
             onChange={(event) => updateForm("purpose", event.target.value)}
-            className="min-h-28 rounded-md border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition focus:border-brand focus:shadow-sm"
+            className="min-h-24 rounded-md border border-line bg-white px-3 py-2.5 text-sm leading-7 outline-none transition focus:border-brand focus:shadow-sm sm:min-h-28 sm:px-4 sm:py-3"
             placeholder="Briefly explain why this item is needed for lab work."
           />
         </label>
@@ -850,7 +850,7 @@ export function PurchaseRequestPanel() {
           <textarea
             value={form.paymentNote}
             onChange={(event) => updateForm("paymentNote", event.target.value)}
-            className="min-h-24 rounded-md border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition focus:border-brand focus:shadow-sm"
+            className="min-h-20 rounded-md border border-line bg-white px-3 py-2.5 text-sm leading-7 outline-none transition focus:border-brand focus:shadow-sm sm:min-h-24 sm:px-4 sm:py-3"
             placeholder="Optional note for payment tracking."
           />
         </label>
@@ -871,7 +871,7 @@ export function PurchaseRequestPanel() {
           <button
             type="submit"
             disabled={submitting}
-            className="action-button action-button-primary rounded-md bg-brand px-6 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="action-button action-button-primary w-full rounded-md bg-brand px-6 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {submitting ? "Submitting..." : "Submit Request"}
           </button>
@@ -884,7 +884,7 @@ export function PurchaseRequestPanel() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
               Request History
             </p>
-            <h3 className="mt-3 text-2xl font-semibold">
+            <h3 className="mt-3 text-xl font-semibold sm:text-2xl">
               Your payment requests
             </h3>
           </div>
@@ -954,7 +954,7 @@ export function PurchaseRequestPanel() {
                     >
                       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_auto] lg:items-start">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold">
+                          <p className="break-words font-semibold lg:truncate">
                             {request.item_name}
                           </p>
                           <p className="mt-0.5 text-xs text-muted">
@@ -1002,14 +1002,16 @@ export function PurchaseRequestPanel() {
                           <span className="font-semibold text-foreground">
                             Purpose:
                           </span>{" "}
-                          {request.purpose}
+                          <span className="break-words">{request.purpose}</span>
                         </p>
                         {request.payment_note ? (
                           <p>
                             <span className="font-semibold text-foreground">
                               Note:
                             </span>{" "}
-                            {request.payment_note}
+                            <span className="break-words">
+                              {request.payment_note}
+                            </span>
                           </p>
                         ) : null}
                       </div>
@@ -1052,7 +1054,7 @@ export function PurchaseRequestPanel() {
                         key={request.id}
                         className="grid gap-2 rounded-md bg-[#f7f9fb] px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
                       >
-                        <p className="truncate font-semibold text-foreground">
+                        <p className="break-words font-semibold text-foreground lg:truncate">
                           {request.item_name}
                         </p>
                         <p className="font-semibold">

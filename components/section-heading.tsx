@@ -14,10 +14,12 @@ export function SectionHeading({
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">
         {eyebrow}
       </p>
-      <h2 className="text-3xl font-[650] leading-tight text-foreground md:text-4xl">
+      <h2 className="break-words text-2xl font-[650] leading-tight text-foreground sm:text-3xl md:text-4xl">
         {title}
       </h2>
-      <p className="text-base leading-8 text-muted md:text-lg">{description}</p>
+      <p className="break-words text-base leading-8 text-muted md:text-lg">
+        {description}
+      </p>
     </div>
   );
 }

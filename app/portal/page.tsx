@@ -33,16 +33,16 @@ export default function PortalPage() {
 
   return (
     <PortalAuthGuard>
-      <section className="mx-auto grid max-w-7xl gap-5 px-6 pb-10 pt-10 lg:grid-cols-[0.86fr_1.14fr]">
+      <section className="mx-auto grid max-w-7xl gap-5 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:grid-cols-[0.86fr_1.14fr]">
         <div className="rounded-lg border border-line bg-[#16242d] p-5 text-white shadow-panel md:p-6">
           <LockKeyhole className="h-6 w-6 text-brand-soft" />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-brand-soft">
             Portal Home
           </p>
-          <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">
+          <h1 className="mt-3 break-words text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">
             CENL payment tracking workspace
           </h1>
-          <p className="mt-3 text-sm leading-7 text-white/75">
+          <p className="mt-3 break-words text-sm leading-7 text-white/75">
             Students submit purchase requests without choosing a Funding Source.
             Professor/admin users assign Funding Sources when payments are made
             and keep Merchant records tidy.
@@ -90,7 +90,7 @@ export default function PortalPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
                   Payment & Budget
                 </p>
-                <p className="mt-1 text-xs leading-5 text-muted">
+                <p className="mt-1 break-words text-xs leading-5 text-muted">
                   Track merchant-based pending payments, paid expenses, and
                   funding source budgets.
                 </p>
@@ -107,7 +107,7 @@ export default function PortalPage() {
                   >
                     <Icon className="h-4 w-4 text-brand" />
                     <h2 className="mt-2 text-sm font-semibold">{item.label}</h2>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">
+                    <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-muted">
                       {item.description}
                     </p>
                   </Link>
@@ -121,7 +121,7 @@ export default function PortalPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
                 Website Management
               </p>
-              <p className="mt-1 text-xs leading-5 text-muted">
+              <p className="mt-1 break-words text-xs leading-5 text-muted">
                 Manage public website content without editing code.
               </p>
             </div>
@@ -138,7 +138,7 @@ export default function PortalPage() {
                       <Icon className="h-4 w-4 text-brand" />
                       <h2 className="text-sm font-semibold">{item.label}</h2>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">
+                    <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-muted">
                       {item.description}
                     </p>
                   </Link>
@@ -153,7 +153,7 @@ export default function PortalPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
                   System Admin
                 </p>
-                <p className="mt-1 text-xs leading-5 text-muted">
+                <p className="mt-1 break-words text-xs leading-5 text-muted">
                   Manage users, funding sources, project admins, and merchant
                   records.
                 </p>

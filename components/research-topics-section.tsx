@@ -33,8 +33,13 @@ export function ResearchTopicsSection() {
   }, []);
 
   return (
-    <section className="mx-auto max-w-7xl px-6">
-      <div className="space-y-10">
+    <section className="mx-auto max-w-7xl px-4 sm:px-6">
+      {items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+          No research topics are available yet.
+        </div>
+      ) : null}
+      <div className="space-y-8 sm:space-y-10">
         {items.map((topic, index) => {
           const Icon = topic.icon;
           const reversed = index % 2 === 1;
@@ -42,12 +47,12 @@ export function ResearchTopicsSection() {
           return (
             <article
               key={topic.slug}
-              className="grid gap-8 border-b border-line pb-10 lg:grid-cols-2 lg:items-center"
+              className="grid gap-6 border-b border-line pb-8 sm:gap-8 sm:pb-10 lg:grid-cols-2 lg:items-center"
             >
               <div className={reversed ? "lg:order-2" : ""}>
                 {topic.imageUrl ? (
                   <div
-                    className="min-h-[340px] rounded-lg bg-cover bg-center"
+                    className="min-h-[240px] rounded-lg bg-cover bg-center sm:min-h-[300px] lg:min-h-[340px]"
                     style={{ backgroundImage: `url(${topic.imageUrl})` }}
                     role="img"
                     aria-label={topic.imageLabel}
@@ -55,21 +60,23 @@ export function ResearchTopicsSection() {
                 ) : (
                   <VisualPlaceholder
                     label={topic.imageLabel}
-                    className="min-h-[340px]"
+                    className="min-h-[240px] sm:min-h-[300px] lg:min-h-[340px]"
                   />
                 )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="inline-flex rounded-md bg-brand-soft p-3 text-brand">
                   <Icon className="h-6 w-6" />
                 </span>
-                <h2 className="mt-5 text-3xl font-semibold">{topic.title}</h2>
+                <h2 className="mt-5 break-words text-2xl font-semibold sm:text-3xl">
+                  {topic.title}
+                </h2>
                 {topic.subtitle ? (
-                  <p className="mt-3 text-lg font-medium text-brand">
+                  <p className="mt-3 break-words text-base font-medium text-brand sm:text-lg">
                     {topic.subtitle}
                   </p>
                 ) : null}
-                <p className="mt-4 text-base leading-8 text-muted">
+                <p className="mt-4 break-words text-base leading-8 text-muted">
                   {topic.description}
                 </p>
                 {topic.points.length > 0 ? (

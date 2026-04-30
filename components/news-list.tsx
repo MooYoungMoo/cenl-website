@@ -25,7 +25,7 @@ export function NewsList({ items }: NewsListProps) {
 
   return (
     <div>
-      <div className="mb-8 flex gap-2 overflow-x-auto pb-2">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 sm:mb-8">
         {newsCategoryOptions.map((option) => {
           const active = activeCategory === option.value;
 
@@ -46,7 +46,13 @@ export function NewsList({ items }: NewsListProps) {
         })}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      {visibleItems.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+          No news posts are available in this category yet.
+        </div>
+      ) : null}
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {visibleItems.map((item) => (
           <Link
             key={item.slug}
@@ -55,7 +61,7 @@ export function NewsList({ items }: NewsListProps) {
           >
             {item.imageUrl ? (
               <div
-                className="min-h-48 rounded-none bg-cover bg-center"
+                className="min-h-44 rounded-none bg-cover bg-center sm:min-h-48"
                 style={{ backgroundImage: `url(${item.imageUrl})` }}
                 role="img"
                 aria-label={item.representativeImage}
@@ -66,15 +72,19 @@ export function NewsList({ items }: NewsListProps) {
                 className="min-h-48 rounded-none"
               />
             )}
-            <div className="p-6">
+            <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="font-medium text-brand">{item.date}</span>
                 <span className="rounded-md bg-accent-soft px-2 py-1 text-accent">
                   {item.category}
                 </span>
               </div>
-              <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-muted">{item.summary}</p>
+              <h2 className="mt-4 break-words text-lg font-semibold leading-7 sm:text-xl">
+                {item.title}
+              </h2>
+              <p className="mt-3 break-words text-sm leading-7 text-muted">
+                {item.summary}
+              </p>
               <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand">
                 Read more
                 <ArrowRight className="h-4 w-4" />
