@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PortalIdleTimeout } from "@/components/portal-idle-timeout";
 
 export const metadata: Metadata = {
   title: "Lab Portal",
@@ -14,5 +15,10 @@ export default function PortalLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return (
+    <>
+      <PortalIdleTimeout />
+      {children}
+    </>
+  );
 }

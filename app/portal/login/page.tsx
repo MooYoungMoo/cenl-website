@@ -10,6 +10,17 @@ export default function PortalLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    const reason = new URLSearchParams(window.location.search).get("reason");
+
+    return reason === "timeout"
+      ? "You were signed out due to inactivity."
+      : "";
+  });
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
@@ -83,6 +94,11 @@ export default function PortalLoginPage() {
             Enter your lab portal email and password.
           </p>
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+            {notice ? (
+              <div className="rounded-md border border-brand-soft/40 bg-white/10 px-4 py-3 text-sm text-brand-soft">
+                {notice}
+              </div>
+            ) : null}
             <div>
               <label className="mb-2 block text-sm text-white/75">
                 Institutional Email
