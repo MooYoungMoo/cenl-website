@@ -29,6 +29,8 @@ type PublicationForm = {
   imageUrl: string;
   highlightedAuthors: string;
   labContribution: string;
+  isCoverArticle: boolean;
+  coverLabel: string;
   isFeatured: boolean;
   isVisible: boolean;
   displayOrder: string;
@@ -44,13 +46,15 @@ const emptyPublicationForm: PublicationForm = {
   imageUrl: "",
   highlightedAuthors: "",
   labContribution: "none",
+  isCoverArticle: false,
+  coverLabel: "Cover Article",
   isFeatured: false,
   isVisible: true,
   displayOrder: "0",
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
 
 const contributionOptions = [
   { value: "none", label: "No badge" },
@@ -61,6 +65,14 @@ const contributionOptions = [
     value: "first_and_corresponding_author",
     label: "Lab first & corresponding author",
   },
+];
+
+const coverLabelOptions = [
+  "Cover Article",
+  "Inside Front Cover Article",
+  "Supplementary Cover Article",
+  "Back Cover Article",
+  "Other",
 ];
 
 const maxImageSize = 5 * 1024 * 1024;
@@ -81,6 +93,8 @@ function toPublicationForm(publication: PublicationRecord): PublicationForm {
     imageUrl: publication.image_url ?? "",
     highlightedAuthors: (publication.highlighted_authors ?? []).join(", "),
     labContribution: publication.lab_contribution || "none",
+    isCoverArticle: publication.is_cover_article === true,
+    coverLabel: publication.cover_label || "Cover Article",
     isFeatured: publication.is_featured === true,
     isVisible: publication.is_visible !== false,
     displayOrder: String(publication.display_order ?? 0),
@@ -115,6 +129,8 @@ function getPublicationPayload(
     image_url: nextImageUrl,
     highlighted_authors: parseHighlightedAuthors(form.highlightedAuthors),
     lab_contribution: form.labContribution || "none",
+    is_cover_article: form.isCoverArticle,
+    cover_label: form.isCoverArticle ? form.coverLabel.trim() || null : null,
     is_featured: form.isFeatured,
     is_visible: form.isVisible,
     display_order: parseDisplayOrder(form.displayOrder),
@@ -801,6 +817,27 @@ export default function PortalPublicationsPage() {
           </option>
         ))}
       </select>
+      <label className="flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-muted">
+        <input
+          type="checkbox"
+          checked={form.isCoverArticle}
+          onChange={(event) => onChange("isCoverArticle", event.target.checked)}
+          className="h-4 w-4 rounded border-line"
+        />
+        Cover publication
+      </label>
+      <select
+        value={form.coverLabel}
+        onChange={(event) => onChange("coverLabel", event.target.value)}
+        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+        aria-label="Cover label"
+      >
+        {coverLabelOptions.map((label) => (
+          <option key={label} value={label}>
+            {label}
+          </option>
+        ))}
+      </select>
       <input
         value={form.imageUrl}
         onChange={(event) => onChange("imageUrl", event.target.value)}
@@ -1067,13 +1104,14 @@ export default function PortalPublicationsPage() {
 
             {filteredPublications.length > 0 ? (
               <div className="mt-5 overflow-x-auto rounded-md border border-line bg-white/60">
-                <div className="min-w-[1240px] divide-y divide-line">
-                  <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                <div className="min-w-[1340px] divide-y divide-line">
+                  <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_110px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                     <span>Thumbnail</span>
                     <span>Year</span>
                     <span>Title</span>
                     <span>Journal</span>
                     <span>Type</span>
+                    <span>Cover</span>
                     <span>Featured</span>
                     <span>Visible</span>
                     <span>DOI</span>
@@ -1087,7 +1125,7 @@ export default function PortalPublicationsPage() {
 
                     return (
                       <div key={publication.id} className="divide-y divide-line">
-                        <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-3 text-sm">
+                        <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_110px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-3 text-sm">
                           <div>{thumbnail(publication)}</div>
                           <p className="font-semibold">
                             {publication.publication_year ?? "TBD"}
@@ -1114,6 +1152,11 @@ export default function PortalPublicationsPage() {
                           </p>
                           <p className="text-sm text-muted">
                             {publication.publication_type || "Article"}
+                          </p>
+                          <p className="text-xs font-semibold text-muted">
+                            {publication.is_cover_article
+                              ? publication.cover_label || "Cover Article"
+                              : "No"}
                           </p>
                           <button
                             type="button"

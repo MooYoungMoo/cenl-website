@@ -426,6 +426,8 @@ export type PublicationItem = {
   citationCount?: number | null;
   highlightedAuthors?: string[];
   labContribution?: string | null;
+  isCoverArticle?: boolean;
+  coverLabel?: string;
 };
 
 export const publicationItems: PublicationItem[] = [

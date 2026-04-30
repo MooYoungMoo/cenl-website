@@ -1,15 +1,100 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { fetchCoverPublications } from "@/lib/publications";
+import type { PublicationItem } from "@/lib/site-data";
 
-type CoverCarouselProps = {
-  covers: string[];
-};
+function CoverPublicationCard({
+  publication,
+}: {
+  publication: PublicationItem;
+}) {
+  return (
+    <article className="relative min-w-[7.5rem] snap-start overflow-hidden rounded-md border border-line bg-white shadow-sm sm:min-w-[8.5rem] lg:min-w-[9.5rem]">
+      {publication.imageUrl ? (
+        <div
+          className="aspect-[210/297] bg-cover bg-center"
+          style={{ backgroundImage: `url(${publication.imageUrl})` }}
+          role="img"
+          aria-label={publication.imageLabel}
+        />
+      ) : (
+        <VisualPlaceholder
+          label="Cover publication placeholder"
+          className="aspect-[210/297] min-h-0 rounded-none"
+        />
+      )}
+      {publication.coverLabel ? (
+        <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-md bg-white/90 px-2 py-1 text-[0.65rem] font-semibold text-brand shadow-sm backdrop-blur">
+          {publication.coverLabel}
+        </span>
+      ) : null}
+    </article>
+  );
+}
 
-export function CoverCarousel({ covers }: CoverCarouselProps) {
+export function CoverCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+  const [items, setItems] = useState<PublicationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCoverPublications = async () => {
+      try {
+        const publications = await fetchCoverPublications();
+
+        if (mounted) {
+          setItems(publications);
+        }
+      } catch {
+        if (mounted) {
+          setItems([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadCoverPublications();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (items.length < 3) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      const scroller = scrollerRef.current;
+
+      if (!scroller || pausedRef.current) {
+        return;
+      }
+
+      const nextLeft = scroller.scrollLeft + 160;
+      const reachedEnd =
+        nextLeft + scroller.clientWidth >= scroller.scrollWidth - 8;
+
+      scroller.scrollTo({
+        left: reachedEnd ? 0 : nextLeft,
+        behavior: "smooth",
+      });
+    }, 4200);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [items.length]);
 
   const scroll = (direction: "left" | "right") => {
     const scroller = scrollerRef.current;
@@ -19,21 +104,34 @@ export function CoverCarousel({ covers }: CoverCarouselProps) {
     }
 
     scroller.scrollBy({
-      left: direction === "left" ? -420 : 420,
+      left: direction === "left" ? -scroller.clientWidth : scroller.clientWidth,
       behavior: "smooth",
     });
   };
 
   return (
-    <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
-          Featured Visuals
-        </p>
+    <div
+      className="rounded-lg border border-line bg-white p-3 shadow-panel sm:p-4"
+      onMouseEnter={() => {
+        pausedRef.current = true;
+      }}
+      onMouseLeave={() => {
+        pausedRef.current = false;
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+            Cover Publications
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Compact visual strip of journal cover records.
+          </p>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
-            aria-label="Previous covers"
+            aria-label="Previous cover publications"
             onClick={() => scroll("left")}
             className="action-button action-button-secondary inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-white"
           >
@@ -41,7 +139,7 @@ export function CoverCarousel({ covers }: CoverCarouselProps) {
           </button>
           <button
             type="button"
-            aria-label="Next covers"
+            aria-label="Next cover publications"
             onClick={() => scroll("right")}
             className="action-button action-button-secondary inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-white"
           >
@@ -49,15 +147,29 @@ export function CoverCarousel({ covers }: CoverCarouselProps) {
           </button>
         </div>
       </div>
-      <div ref={scrollerRef} className="flex gap-4 overflow-x-auto pb-2">
-        {covers.map((cover) => (
-          <VisualPlaceholder
-            key={cover}
-            label={cover}
-            className="min-h-48 min-w-72 rounded-lg"
-          />
-        ))}
-      </div>
+
+      {loading ? (
+        <div className="rounded-md border border-dashed border-line p-4 text-sm text-muted">
+          Loading cover publications...
+        </div>
+      ) : null}
+
+      {!loading && items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line p-4 text-sm text-muted">
+          No cover publications are available yet.
+        </div>
+      ) : null}
+
+      {items.length > 0 ? (
+        <div ref={scrollerRef} className="flex snap-x gap-3 overflow-x-auto pb-1">
+          {items.map((publication) => (
+            <CoverPublicationCard
+              key={publication.id}
+              publication={publication}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

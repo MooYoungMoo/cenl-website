@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CoverCarousel } from "@/components/cover-carousel";
 import { PageHero } from "@/components/page-hero";
-import { publicationCovers, publicationSections } from "@/lib/site-data";
+import { publicationSections } from "@/lib/site-data";
 
 export const metadata: Metadata = {
   title: "Publications",
@@ -20,7 +20,7 @@ export default function PublicationsPage() {
         description="The publications section is prepared as two subpages, keeping scholarly papers and intellectual property entries easy to maintain."
       />
       <section className="mx-auto max-w-7xl px-6">
-        <CoverCarousel covers={publicationCovers} />
+        <CoverCarousel />
       </section>
       <section className="mx-auto grid max-w-5xl gap-6 px-6 pt-10 md:grid-cols-2">
         {publicationSections.map((section) => {

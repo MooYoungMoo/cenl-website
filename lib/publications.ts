@@ -12,6 +12,8 @@ export type SupabasePublication = {
   image_url: string | null;
   highlighted_authors: string[] | null;
   lab_contribution: string | null;
+  is_cover_article: boolean | null;
+  cover_label: string | null;
   is_featured: boolean | null;
   is_visible: boolean | null;
   display_order: number | null;
@@ -21,7 +23,7 @@ export type SupabasePublication = {
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
 
 function isUrl(value: string) {
   return /^https?:\/\//i.test(value);
@@ -46,6 +48,8 @@ export function mapPublicationRecord(
     citationCount: null,
     highlightedAuthors: publication.highlighted_authors ?? [],
     labContribution: publication.lab_contribution || "none",
+    isCoverArticle: publication.is_cover_article === true,
+    coverLabel: publication.cover_label?.trim() || undefined,
   };
 }
 
@@ -73,6 +77,18 @@ export async function fetchFeaturedPublications() {
 
 export async function fetchVisiblePublications() {
   const { data, error } = await orderedPublicationQuery();
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as SupabasePublication[]).map(mapPublicationRecord);
+}
+
+export async function fetchCoverPublications() {
+  const { data, error } = await orderedPublicationQuery()
+    .eq("is_cover_article", true)
+    .limit(12);
 
   if (error) {
     throw error;
