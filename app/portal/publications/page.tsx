@@ -212,7 +212,7 @@ function thumbnail(publication: PublicationRecord) {
   if (publication.image_url) {
     return (
       <div
-        className="aspect-square w-16 rounded-md border border-line bg-cover bg-center"
+        className="aspect-square w-24 rounded-md border border-line bg-cover bg-center"
         style={{ backgroundImage: `url(${publication.image_url})` }}
         role="img"
         aria-label={`${publication.title} thumbnail`}
@@ -221,7 +221,7 @@ function thumbnail(publication: PublicationRecord) {
   }
 
   return (
-    <div className="flex aspect-square w-16 items-center justify-center rounded-md border border-dashed border-line bg-white/70 text-muted">
+    <div className="flex aspect-square w-24 items-center justify-center rounded-md border border-dashed border-line bg-white/70 text-muted">
       <ImageIcon className="h-4 w-4" />
     </div>
   );
@@ -286,7 +286,7 @@ export default function PortalPublicationsPage() {
       .from("publications")
       .select(publicationSelect)
       .order("publication_year", { ascending: false })
-      .order("display_order", { ascending: true })
+      .order("display_order", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -814,13 +814,13 @@ export default function PortalPublicationsPage() {
         <div className="mt-2 flex items-center gap-3">
           {form.imageUrl.trim() ? (
             <div
-              className="aspect-square w-16 rounded-md border border-line bg-cover bg-center"
+              className="aspect-square w-24 rounded-md border border-line bg-cover bg-center"
               style={{ backgroundImage: `url(${form.imageUrl.trim()})` }}
               role="img"
               aria-label="Publication thumbnail preview"
             />
           ) : (
-            <div className="flex aspect-square w-16 items-center justify-center rounded-md border border-dashed border-line text-muted">
+            <div className="flex aspect-square w-24 items-center justify-center rounded-md border border-dashed border-line text-muted">
               <ImageIcon className="h-4 w-4" />
             </div>
           )}
@@ -1067,8 +1067,8 @@ export default function PortalPublicationsPage() {
 
             {filteredPublications.length > 0 ? (
               <div className="mt-5 overflow-x-auto rounded-md border border-line bg-white/60">
-                <div className="min-w-[1180px] divide-y divide-line">
-                  <div className="grid grid-cols-[96px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                <div className="min-w-[1240px] divide-y divide-line">
+                  <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                     <span>Thumbnail</span>
                     <span>Year</span>
                     <span>Title</span>
@@ -1087,7 +1087,7 @@ export default function PortalPublicationsPage() {
 
                     return (
                       <div key={publication.id} className="divide-y divide-line">
-                        <div className="grid grid-cols-[96px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-3 text-sm">
+                        <div className="grid grid-cols-[112px_64px_minmax(260px,1.5fr)_minmax(160px,0.8fr)_100px_92px_84px_minmax(120px,0.7fr)_auto] gap-3 px-3 py-3 text-sm">
                           <div>{thumbnail(publication)}</div>
                           <p className="font-semibold">
                             {publication.publication_year ?? "TBD"}

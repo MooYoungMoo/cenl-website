@@ -55,7 +55,7 @@ function orderedPublicationQuery() {
     .select(publicationSelect)
     .eq("is_visible", true)
     .order("publication_year", { ascending: false })
-    .order("display_order", { ascending: true })
+    .order("display_order", { ascending: false })
     .order("created_at", { ascending: false });
 }
 

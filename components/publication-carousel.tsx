@@ -58,7 +58,7 @@ export function PublicationCarousel({ items }: PublicationCarouselProps) {
         {items.map((item) => (
           <article
             key={item.id}
-            className="elevated-card min-w-[82%] snap-start overflow-hidden border border-line bg-white sm:min-w-[48%] lg:min-w-[calc((100%_-_2.5rem)/3)]"
+            className="elevated-card min-w-[90%] snap-start overflow-hidden border border-line bg-white sm:min-w-[58%] lg:min-w-[calc((100%_-_1.25rem)/2)]"
           >
             {item.imageUrl ? (
               <div

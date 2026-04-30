@@ -13,7 +13,7 @@ import { papers, type PublicationItem } from "@/lib/site-data";
 function PublicationCard({ paper }: { paper: PublicationItem }) {
   return (
     <article className="elevated-card border border-line bg-white p-4 sm:p-6">
-      <div className="grid gap-4 sm:gap-5 md:grid-cols-[120px_minmax(0,1fr)] lg:grid-cols-[140px_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:gap-5 md:grid-cols-[180px_minmax(0,1fr)] lg:grid-cols-[210px_minmax(0,1fr)]">
         {paper.imageUrl ? (
           <div
             className="aspect-square rounded-md bg-cover bg-center"
