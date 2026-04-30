@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Image as ImageIcon, Plus, Search } from "lucide-react";
+import { PortalOngoingProjectsManager } from "@/components/portal-ongoing-projects-manager";
 import { PortalShell } from "@/components/portal-shell";
 import type { SupabaseResearchTopic } from "@/lib/research";
 import { supabase } from "@/lib/supabase/client";
@@ -706,7 +707,7 @@ export default function PortalResearchPage() {
   return (
     <PortalShell
       title="Research"
-      description="Manage public research topic sections and images."
+      description="Manage ongoing projects, public research topic sections, and images."
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -715,8 +716,9 @@ export default function PortalResearchPage() {
           </p>
           <h2 className="mt-4 text-3xl font-semibold">Research management</h2>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
-            Maintain Supabase-backed research topic sections for the public
-            Research page. Homepage research highlights remain static for now.
+            Maintain Supabase-backed ongoing projects and research directions
+            for the public Research page. Homepage research highlights remain
+            static for now.
           </p>
         </div>
         {!loading && userCanManageResearch ? (
@@ -757,6 +759,8 @@ export default function PortalResearchPage() {
 
       {!loading && userCanManageResearch ? (
         <div className="mt-8 grid gap-6">
+          <PortalOngoingProjectsManager currentUserId={currentUserId} />
+
           {showAddForm ? (
             <section className="portal-card rounded-lg border border-line p-5 shadow-panel">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -787,6 +791,14 @@ export default function PortalResearchPage() {
           ) : null}
 
           <section className="portal-card rounded-lg border border-line p-5 shadow-panel">
+            <div className="mb-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+                Research Directions
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold">
+                Research topic management
+              </h3>
+            </div>
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
