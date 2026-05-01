@@ -123,7 +123,7 @@ function formatDate(value: string | null) {
 }
 
 function getApprovalStatus(profile: ManagedProfile) {
-  return (profile.approval_status ?? "approved").toLowerCase();
+  return (profile.approval_status ?? "approved").trim().toLowerCase();
 }
 
 function getApprovalBadgeClass(status: string) {
@@ -1398,6 +1398,11 @@ export default function AdminPage() {
               Project-specific admins are assigned under each Funding Source.
               Project admin assignment does not require changing the user role
               to admin.
+            </p>
+            <p>
+              New sign-ups stay pending until approved. If Supabase email
+              confirmation is enabled, users must also confirm their email
+              before they can log in.
             </p>
           </div>
         </div>

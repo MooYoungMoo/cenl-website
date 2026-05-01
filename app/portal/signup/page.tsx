@@ -14,6 +14,11 @@ type SignupForm = {
   signupNote: string;
 };
 
+type ExistingProfile = {
+  role: string | null;
+  approval_status: string | null;
+};
+
 const emptyForm: SignupForm = {
   fullName: "",
   email: "",
@@ -22,6 +27,15 @@ const emptyForm: SignupForm = {
   position: "",
   signupNote: "",
 };
+
+function isEmailConfirmationMessage(message: string) {
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes("email") &&
+    (normalized.includes("confirm") || normalized.includes("confirmation"))
+  );
+}
 
 export default function PortalSignupPage() {
   const [form, setForm] = useState<SignupForm>(emptyForm);
@@ -47,6 +61,7 @@ export default function PortalSignupPage() {
     }
 
     setLoading(true);
+    const requestedAt = new Date().toISOString();
 
     const { data, error: signupError } = await supabase.auth.signUp({
       email,
@@ -58,13 +73,22 @@ export default function PortalSignupPage() {
           position: form.position.trim() || null,
           role: "student",
           approval_status: "pending",
+          requested_at: requestedAt,
+          approved_at: null,
+          approved_by: null,
+          rejected_at: null,
+          rejected_by: null,
           signup_note: form.signupNote.trim() || null,
         },
       },
     });
 
     if (signupError) {
-      setError(signupError.message);
+      setError(
+        isEmailConfirmationMessage(signupError.message)
+          ? "Email confirmation may be required. Please confirm your email address, then wait for professor/admin approval."
+          : signupError.message,
+      );
       setLoading(false);
       return;
     }
@@ -72,6 +96,34 @@ export default function PortalSignupPage() {
     if (!data.user) {
       setError(
         "Your account was created, but the profile request could not be prepared. Please contact the lab administrator.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("role, approval_status")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    const existingRole =
+      ((existingProfile as ExistingProfile | null)?.role ?? "")
+        .trim()
+        .toLowerCase();
+    const existingApproval =
+      (
+        (existingProfile as ExistingProfile | null)?.approval_status ?? ""
+      )
+        .trim()
+        .toLowerCase();
+    const isProtectedExistingProfile =
+      (existingRole === "professor" || existingRole === "admin") &&
+      existingApproval === "approved";
+
+    if (isProtectedExistingProfile) {
+      setError(
+        "This account already has protected portal access. Please sign in instead.",
       );
       setLoading(false);
       return;
@@ -86,22 +138,32 @@ export default function PortalSignupPage() {
         position: form.position.trim() || null,
         role: "student",
         approval_status: "pending",
-        requested_at: new Date().toISOString(),
+        requested_at: requestedAt,
+        approved_at: null,
+        approved_by: null,
+        rejected_at: null,
+        rejected_by: null,
         signup_note: form.signupNote.trim() || null,
       },
       { onConflict: "id" },
     );
 
-    if (profileError) {
+    if (profileError && data.session) {
       setError(profileError.message);
       setLoading(false);
       return;
     }
 
+    if (profileError) {
+      console.warn("Profile access request will rely on auth metadata:", profileError.message);
+    }
+
     await supabase.auth.signOut();
     setForm(emptyForm);
     setSuccess(
-      "Your access request has been submitted. You can log in after a professor/admin approves your account.",
+      data.session
+        ? "Your access request has been submitted. You can log in after a professor/admin approves your account."
+        : "Your access request was submitted. If email confirmation is enabled, please confirm your email first. You can access the Lab Portal after professor/admin approval.",
     );
     setLoading(false);
   };

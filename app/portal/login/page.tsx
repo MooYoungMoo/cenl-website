@@ -19,12 +19,26 @@ async function getApprovalStatus(userId: string) {
 
   if (error) {
     console.warn("Unable to check portal approval status:", error.message);
-    return null;
+    return "pending";
   }
 
+  if (!data) {
+    return "pending";
+  }
+
+  return ((data as ApprovalProfile).approval_status ?? "approved")
+    .trim()
+    .toLowerCase();
+}
+
+function isEmailNotConfirmedError(message: string) {
+  const normalized = message.toLowerCase();
+
   return (
-    ((data as ApprovalProfile | null)?.approval_status ?? null)?.toLowerCase() ??
-    null
+    normalized.includes("email") &&
+    (normalized.includes("not confirmed") ||
+      normalized.includes("confirm your email") ||
+      normalized.includes("email confirmation"))
   );
 }
 
@@ -106,7 +120,11 @@ export default function PortalLoginPage() {
 
     if (signInError) {
       setLoading(false);
-      setError(signInError.message);
+      setError(
+        isEmailNotConfirmedError(signInError.message)
+          ? "Please confirm your email address first, then wait for professor/admin approval."
+          : signInError.message,
+      );
       return;
     }
 

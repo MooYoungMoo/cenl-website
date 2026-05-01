@@ -22,13 +22,16 @@ async function getApprovalStatus(userId: string) {
 
   if (error) {
     console.warn("Unable to check portal approval status:", error.message);
-    return null;
+    return "pending";
   }
 
-  return (
-    ((data as ApprovalProfile | null)?.approval_status ?? null)?.toLowerCase() ??
-    null
-  );
+  if (!data) {
+    return "pending";
+  }
+
+  return ((data as ApprovalProfile).approval_status ?? "approved")
+    .trim()
+    .toLowerCase();
 }
 
 export function PortalAuthGuard({ children }: PortalAuthGuardProps) {
