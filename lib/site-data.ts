@@ -842,9 +842,10 @@ export const adminItems: AdminPlaceholderItem[] = [
 ];
 
 export const quickStats: StatItem[] = [
-  { value: "3", label: "Core research themes" },
-  { value: "5", label: "News categories" },
-  { value: "UI", label: "Portal phase" },
+  { value: String(publicationItems.length), label: "Publications" },
+  { value: String(patents.length), label: "Patents" },
+  { value: "-", label: "Ongoing Projects" },
+  { value: String(labMembers.length), label: "Lab Members" },
 ];
 
 export const homeFeatureLinks: IconLink[] = [

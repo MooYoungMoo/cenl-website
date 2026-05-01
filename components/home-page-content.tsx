@@ -11,11 +11,13 @@ import {
   fetchHomeContent,
   type HomePageContent,
 } from "@/lib/home";
+import { fetchHomeMetrics } from "@/lib/home-metrics";
 import { homeFeatureLinks, quickStats } from "@/lib/site-data";
 
 export function HomePageContentSection() {
   const [content, setContent] =
     useState<HomePageContent>(fallbackHomeContent);
+  const [metrics, setMetrics] = useState(quickStats);
 
   useEffect(() => {
     let mounted = true;
@@ -35,6 +37,22 @@ export function HomePageContentSection() {
     };
 
     void loadHomeContent();
+
+    const loadHomeMetrics = async () => {
+      try {
+        const nextMetrics = await fetchHomeMetrics();
+
+        if (mounted) {
+          setMetrics(nextMetrics);
+        }
+      } catch {
+        if (mounted) {
+          setMetrics(quickStats);
+        }
+      }
+    };
+
+    void loadHomeMetrics();
 
     return () => {
       mounted = false;
@@ -87,11 +105,18 @@ export function HomePageContentSection() {
       </section>
 
       <section className="border-y border-line/70 bg-white/70">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-7 sm:px-6 md:grid-cols-3 md:py-8">
-          {quickStats.map((stat) => (
-            <div key={stat.label} className="border-l border-line pl-5">
-              <p className="text-3xl font-semibold text-brand">{stat.value}</p>
-              <p className="mt-1 text-sm text-muted">{stat.label}</p>
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 px-4 py-5 sm:px-6 md:grid-cols-4 md:py-6">
+          {metrics.map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-md border border-line/70 bg-white/75 px-4 py-3 shadow-sm"
+            >
+              <p className="text-2xl font-semibold leading-none text-brand sm:text-3xl">
+                {stat.value}
+              </p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                {stat.label}
+              </p>
             </div>
           ))}
         </div>
