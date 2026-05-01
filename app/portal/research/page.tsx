@@ -46,7 +46,7 @@ const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function keywordsToText(keywords: string[] | null) {
@@ -199,7 +199,7 @@ async function uploadResearchImageToStorage(file: File, folderId: string) {
 export default function PortalResearchPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [topics, setTopics] = useState<ResearchRecord[]>([]);
   const [researchForm, setResearchForm] =
     useState<ResearchForm>(emptyResearchForm);
@@ -224,7 +224,7 @@ export default function PortalResearchPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageResearch = canManage(role) || userIsProjectAdmin;
+  const userCanManageResearch = canManage(role);
 
   const loadResearchTopics = useCallback(async () => {
     const { data, error } = await supabase
@@ -293,7 +293,7 @@ export default function PortalResearchPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadResearchTopics();
     }
 

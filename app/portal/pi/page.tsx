@@ -50,7 +50,7 @@ const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function toPiForm(content: PiProfileContent): PiForm {
@@ -175,7 +175,7 @@ async function uploadPiPhotoToStorage(file: File) {
 export default function PortalPiManagementPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [piForm, setPiForm] = useState<PiForm>(
     toPiForm(fallbackPiProfileContent),
   );
@@ -187,7 +187,7 @@ export default function PortalPiManagementPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManagePi = canManage(role) || userIsProjectAdmin;
+  const userCanManagePi = canManage(role);
 
   const loadPiContent = useCallback(async () => {
     const { data, error } = await supabase
@@ -252,7 +252,7 @@ export default function PortalPiManagementPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadPiContent();
     }
 

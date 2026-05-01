@@ -51,7 +51,7 @@ const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function toMemberForm(member: MemberRecord): MemberForm {
@@ -199,7 +199,7 @@ async function uploadMemberPhotoToStorage(file: File, folderId: string) {
 export default function PortalMembersPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [memberForm, setMemberForm] = useState<MemberForm>(emptyMemberForm);
   const [memberDrafts, setMemberDrafts] = useState<Record<string, MemberForm>>(
@@ -225,7 +225,7 @@ export default function PortalMembersPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageMembers = canManage(role) || userIsProjectAdmin;
+  const userCanManageMembers = canManage(role);
 
   const loadMembers = useCallback(async () => {
     const { data, error } = await supabase
@@ -294,7 +294,7 @@ export default function PortalMembersPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadMembers();
     }
 

@@ -1,17 +1,47 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { PortalAuthGuard } from "@/components/portal-auth-guard";
 import { PortalLogoutButton } from "@/components/portal-logout-button";
+import {
+  filterPortalNavigationSections,
+  normalizePortalRole,
+} from "@/lib/portal-permissions";
 import { portalNavigationSections } from "@/lib/site-data";
+import { supabase } from "@/lib/supabase/client";
+
+type Profile = {
+  role: string | null;
+};
+
+type FundingSourceManager = {
+  funding_source_id: string;
+};
 
 export default function PortalPage() {
+  const [role, setRole] = useState<string | null>(null);
+  const [isProjectAdmin, setIsProjectAdmin] = useState(false);
+  const visibleNavigationSections = useMemo(
+    () =>
+      filterPortalNavigationSections({
+        sections: portalNavigationSections,
+        role,
+        isProjectAdmin,
+      }),
+    [isProjectAdmin, role],
+  );
   const paymentLinks =
-    portalNavigationSections.find((section) => section.title === "Payment & Budget")
+    visibleNavigationSections.find((section) => section.title === "Payment & Budget")
       ?.links ?? [];
   const websiteLinks =
-    portalNavigationSections.find(
+    visibleNavigationSections.find(
       (section) => section.title === "Website Management",
     )?.links ?? [];
+  const systemAdminLinks =
+    visibleNavigationSections.find((section) => section.title === "System Admin")
+      ?.links ?? [];
   const systemAdminItems = [
     "User Management",
     "Funding Sources",
@@ -30,6 +60,50 @@ export default function PortalPage() {
     "Monitor budgets",
     "Manage Merchants and Funding Sources in Admin",
   ];
+  const roleNotes = [
+    "Lab Manager: manages public website content.",
+    "Project Admin: manages assigned Funding Source payment workflows.",
+    "Student: submits purchase requests and tracks personal request status.",
+  ];
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPortalRole = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!mounted || !user) {
+        return;
+      }
+
+      const [profileResult, managersResult] = await Promise.all([
+        supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("funding_source_managers")
+          .select("funding_source_id")
+          .eq("user_id", user.id),
+      ]);
+
+      if (!mounted) {
+        return;
+      }
+
+      setRole(
+        normalizePortalRole((profileResult.data as Profile | null)?.role ?? null),
+      );
+      setIsProjectAdmin(
+        ((managersResult.data ?? []) as FundingSourceManager[]).length > 0,
+      );
+    };
+
+    void loadPortalRole();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <PortalAuthGuard>
@@ -44,8 +118,8 @@ export default function PortalPage() {
           </h1>
           <p className="mt-3 break-words text-sm leading-7 text-white/75">
             Students submit purchase requests without choosing a Funding Source.
-            Professor/admin users assign Funding Sources when payments are made
-            and keep Merchant records tidy.
+            Professor/admin and assigned Project Admin users manage payment
+            workflows. Lab Managers manage public website content only.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <span className="inline-flex items-center gap-2 rounded-md border border-white/15 px-3 py-2 text-xs text-white/75">
@@ -65,6 +139,16 @@ export default function PortalPage() {
                   </li>
                 ))}
               </ol>
+            </div>
+            <div>
+              <p className="font-semibold uppercase tracking-[0.16em] text-brand-soft">
+                Role guide
+              </p>
+              <ul className="mt-2 grid gap-1">
+                {roleNotes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
             </div>
             <div>
               <p className="font-semibold uppercase tracking-[0.16em] text-brand-soft">
@@ -116,6 +200,7 @@ export default function PortalPage() {
             </div>
           </section>
 
+          {websiteLinks.length > 0 ? (
           <section className="portal-card rounded-lg border border-line bg-white/70 p-4 shadow-panel">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
@@ -146,7 +231,9 @@ export default function PortalPage() {
               })}
             </div>
           </section>
+          ) : null}
 
+          {systemAdminLinks.length > 0 ? (
           <section className="portal-card rounded-lg border border-line bg-white/70 p-4 shadow-panel">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -158,12 +245,15 @@ export default function PortalPage() {
                   records.
                 </p>
               </div>
-              <Link
-                href="/portal/admin"
-                className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white"
-              >
-                Open Admin
-              </Link>
+              {systemAdminLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-xs font-semibold text-brand transition hover:bg-white"
+                >
+                  Open {item.label}
+                </Link>
+              ))}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {systemAdminItems.map((item) => (
@@ -176,6 +266,7 @@ export default function PortalPage() {
               ))}
             </div>
           </section>
+          ) : null}
         </div>
       </section>
     </PortalAuthGuard>

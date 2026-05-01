@@ -38,7 +38,7 @@ const contactSelect =
   "id, recruiting_title, recruiting_description, recruiting_areas, application_emails, lab_name, contact_person, contact_role, contact_email, address, map_url, map_embed_url, updated_by, created_at, updated_at";
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function listToText(values: string[]) {
@@ -105,7 +105,7 @@ function validateContactForm(form: ContactForm) {
 export default function PortalContactPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [contactForm, setContactForm] = useState<ContactForm>(
     toContactForm(fallbackContactContent),
   );
@@ -114,7 +114,7 @@ export default function PortalContactPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageContact = canManage(role) || userIsProjectAdmin;
+  const userCanManageContact = canManage(role);
 
   const loadContactContent = useCallback(async () => {
     const { data, error } = await supabase
@@ -181,7 +181,7 @@ export default function PortalContactPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadContactContent();
     }
 

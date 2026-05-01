@@ -30,7 +30,7 @@ const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function getSiteSettingsPayload(
@@ -132,7 +132,7 @@ async function uploadSiteImageToStorage(file: File, prefix: "logo" | "og") {
 export default function PortalSiteSettingsPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [settingsForm, setSettingsForm] =
     useState<SiteSettingsForm>(fallbackSiteSettings);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -145,7 +145,7 @@ export default function PortalSiteSettingsPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageSiteSettings = canManage(role) || userIsProjectAdmin;
+  const userCanManageSiteSettings = canManage(role);
 
   const loadSiteSettings = useCallback(async () => {
     const { data, error } = await supabase
@@ -210,7 +210,7 @@ export default function PortalSiteSettingsPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadSiteSettings();
     }
 

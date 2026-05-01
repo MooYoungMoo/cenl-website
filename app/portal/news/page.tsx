@@ -66,7 +66,7 @@ const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function slugify(value: string) {
@@ -257,7 +257,7 @@ async function uploadNewsImageToStorage(
 export default function PortalNewsPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [newsPosts, setNewsPosts] = useState<NewsPostRecord[]>([]);
   const [newsForm, setNewsForm] = useState<NewsPostForm>(emptyNewsForm);
   const [newsDrafts, setNewsDrafts] = useState<Record<string, NewsPostForm>>({});
@@ -279,7 +279,7 @@ export default function PortalNewsPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageNews = canManage(role) || userIsProjectAdmin;
+  const userCanManageNews = canManage(role);
 
   const loadNewsPosts = useCallback(async () => {
     const { data, error } = await supabase
@@ -349,7 +349,7 @@ export default function PortalNewsPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadNewsPosts();
     }
 

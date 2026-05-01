@@ -52,7 +52,7 @@ const statusOptions = ["Filed", "Published", "Registered", "Granted", "Pending"]
 const pageSize = 20;
 
 function canManage(role: string | null) {
-  return role === "professor" || role === "admin";
+  return role === "professor" || role === "admin" || role === "lab_manager";
 }
 
 function toPatentForm(patent: SupabasePatent): PatentForm {
@@ -135,7 +135,7 @@ function formatDate(value: string | null) {
 export default function PortalPatentsPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userIsProjectAdmin, setUserIsProjectAdmin] = useState(false);
+  const [, setUserIsProjectAdmin] = useState(false);
   const [patents, setPatents] = useState<SupabasePatent[]>([]);
   const [patentForm, setPatentForm] = useState<PatentForm>(emptyPatentForm);
   const [patentDrafts, setPatentDrafts] = useState<Record<string, PatentForm>>(
@@ -153,7 +153,7 @@ export default function PortalPatentsPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManagePatents = canManage(role) || userIsProjectAdmin;
+  const userCanManagePatents = canManage(role);
 
   const loadPatents = useCallback(async () => {
     const { data, error } = await supabase
@@ -222,7 +222,7 @@ export default function PortalPatentsPage() {
     setRole(nextRole);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole) || hasProjectAdminAccess) {
+    if (canManage(nextRole)) {
       await loadPatents();
     }
 

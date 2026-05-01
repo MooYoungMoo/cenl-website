@@ -633,16 +633,18 @@ export default function AdminPage() {
 
     const nextRole = draft.role.trim().toLowerCase();
 
-    if (!["student", "professor", "admin"].includes(nextRole)) {
-      setErrorMessage("Role must be student, professor, or admin.");
+    if (!["student", "professor", "admin", "lab_manager"].includes(nextRole)) {
+      setErrorMessage("Role must be student, professor, admin, or lab_manager.");
       return;
     }
 
     const currentRole = (profile.role ?? "").toLowerCase();
+    const nextRoleKeepsGlobalAccess =
+      nextRole === "professor" || nextRole === "admin";
     const isSelfDowngrade =
       profile.id === currentUserId &&
       (currentRole === "professor" || currentRole === "admin") &&
-      nextRole === "student";
+      !nextRoleKeepsGlobalAccess;
 
     if (isSelfDowngrade) {
       setErrorMessage("You cannot remove your own professor/admin access.");
@@ -1390,6 +1392,13 @@ export default function AdminPage() {
               professor should remain the final owner.
             </p>
             <p>
+              <span className="font-semibold text-foreground">
+                Lab Manager:
+              </span>{" "}
+              Can manage public website content, but cannot manage payments,
+              budgets, users, funding sources, or merchants.
+            </p>
+            <p>
               <span className="font-semibold text-foreground">student:</span>{" "}
               Can submit purchase requests and manage their own pending
               requests.
@@ -1486,6 +1495,7 @@ export default function AdminPage() {
                     <option value="student">student</option>
                     <option value="professor">professor</option>
                     <option value="admin">admin</option>
+                    <option value="lab_manager">Lab Manager</option>
                   </select>
                   <div className="space-y-1 py-1">
                     <span
@@ -1725,10 +1735,10 @@ export default function AdminPage() {
         file uploads and notifications are still intentionally out of scope.
       </p>
       <p className="mt-2 max-w-2xl text-xs leading-6 text-muted">
-        profiles.role controls global student/professor/admin access.
-        funding_source_managers controls project-specific admin assignment; do
-        not make student project admins global admins unless they need global
-        access.
+        profiles.role controls global student/professor/admin/Lab Manager
+        access. funding_source_managers controls project-specific admin
+        assignment; do not make student project admins global admins unless they
+        need global access.
       </p>
 
       {loading ? (
