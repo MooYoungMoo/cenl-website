@@ -122,9 +122,11 @@ export function ContactContentSection() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
             Campus Map
           </p>
-          {content.mapUrl ? (
+          {content.mapUrl && content.mapEmbedUrl ? (
             <a
               href={content.mapUrl}
+              target="_blank"
+              rel="noreferrer"
               className="text-sm font-semibold text-brand transition hover:text-foreground"
             >
               Open map
@@ -134,10 +136,25 @@ export function ContactContentSection() {
         {content.mapEmbedUrl ? (
           <iframe
             src={content.mapEmbedUrl}
-            title="Campus Map"
+            title="Campus map"
             className="min-h-[280px] w-full rounded-lg border border-line bg-white shadow-panel sm:min-h-[360px]"
             loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
           />
+        ) : content.mapUrl ? (
+          <div className="rounded-lg border border-line bg-white p-6 text-center shadow-panel">
+            <p className="text-sm leading-7 text-muted">
+              Campus map is available as an external link.
+            </p>
+            <a
+              href={content.mapUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="action-button action-button-primary mt-4 inline-flex rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white"
+            >
+              Open campus map
+            </a>
+          </div>
         ) : (
           <VisualPlaceholder
             label="Campus Map"

@@ -366,6 +366,10 @@ export default function PortalContactPage() {
             className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
             placeholder="Map embed URL"
           />
+          <p className="text-xs leading-6 text-muted md:col-span-2">
+            Paste only the Google Maps embed src URL, not the full iframe code.
+            Use Map URL for a normal external campus map link.
+          </p>
           <div className="flex justify-end md:col-span-2">
             <button
               type="submit"

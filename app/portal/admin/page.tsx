@@ -71,6 +71,13 @@ type ManagedProfile = {
   affiliation: string | null;
   position: string | null;
   created_at: string | null;
+  approval_status: string | null;
+  requested_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  signup_note: string | null;
 };
 
 type ManagedProfileForm = {
@@ -113,6 +120,22 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
   }).format(new Date(value));
+}
+
+function getApprovalStatus(profile: ManagedProfile) {
+  return (profile.approval_status ?? "approved").toLowerCase();
+}
+
+function getApprovalBadgeClass(status: string) {
+  if (status === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  if (status === "rejected") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  return "border-brand/20 bg-brand-soft text-brand";
 }
 
 function dateInputValue(value: string | null) {
@@ -166,6 +189,7 @@ export default function AdminPage() {
   const [profileDrafts, setProfileDrafts] = useState<
     Record<string, ManagedProfileForm>
   >({});
+  const [approvalFilter, setApprovalFilter] = useState("all");
   const [fundingForm, setFundingForm] =
     useState<FundingSourceForm>(emptyFundingForm);
   const [fundingDrafts, setFundingDrafts] = useState<
@@ -235,6 +259,16 @@ export default function AdminPage() {
         ),
       ),
     [profiles],
+  );
+
+  const filteredProfiles = useMemo(
+    () =>
+      sortedProfiles.filter((profile) =>
+        approvalFilter === "all"
+          ? true
+          : getApprovalStatus(profile) === approvalFilter,
+      ),
+    [approvalFilter, sortedProfiles],
   );
 
   const profileMap = useMemo(
@@ -401,7 +435,9 @@ export default function AdminPage() {
   const loadProfiles = useCallback(async () => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, email, role, affiliation, position, created_at")
+      .select(
+        "id, full_name, email, role, affiliation, position, created_at, approval_status, requested_at, approved_at, approved_by, rejected_at, rejected_by, signup_note",
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -659,6 +695,76 @@ export default function AdminPage() {
     }
 
     setSuccessMessage("User profile updated.");
+    setSaving(false);
+    await loadProfiles();
+  };
+
+  const handleUpdateApprovalStatus = async (
+    profile: ManagedProfile,
+    nextStatus: "approved" | "rejected",
+  ) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!userIsGlobalManager) {
+      setErrorMessage("You do not have permission to approve portal users.");
+      return;
+    }
+
+    setSaving(true);
+
+    const now = new Date().toISOString();
+    const payload =
+      nextStatus === "approved"
+        ? {
+            approval_status: "approved",
+            approved_at: now,
+            approved_by: currentUserId,
+            rejected_at: null,
+            rejected_by: null,
+          }
+        : {
+            approval_status: "rejected",
+            approved_at: null,
+            approved_by: null,
+            rejected_at: now,
+            rejected_by: currentUserId,
+          };
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", profile.id);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    await logPortalActivity({
+      action:
+        nextStatus === "approved"
+          ? "approve_user_access"
+          : "reject_user_access",
+      entityType: "profile",
+      entityId: profile.id,
+      summary: `${
+        nextStatus === "approved" ? "Approved" : "Rejected"
+      } portal access for ${profile.email ?? profile.full_name ?? profile.id}.`,
+      metadata: {
+        profile_id: profile.id,
+        email: profile.email,
+        previous_approval_status: profile.approval_status,
+        new_approval_status: nextStatus,
+      },
+    });
+
+    setSuccessMessage(
+      nextStatus === "approved"
+        ? "Portal access approved."
+        : "Portal access rejected.",
+    );
     setSaving(false);
     await loadProfiles();
   };
@@ -1268,8 +1374,9 @@ export default function AdminPage() {
           </p>
           <h3 className="mt-3 text-2xl font-semibold">Portal users</h3>
           <p className="mt-3 text-sm leading-7 text-muted">
-            Edit profile labels and portal roles. Account creation and email
-            invitations are intentionally not implemented yet.
+            Edit profile labels and portal roles, and approve or reject new
+            access requests. Account creation from Admin and email invitations
+            are intentionally not implemented yet.
           </p>
           <div className="mt-3 grid gap-1 text-xs leading-6 text-muted">
             <p>
@@ -1294,13 +1401,25 @@ export default function AdminPage() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadProfiles()}
-          className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
-        >
-          Refresh Users
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={approvalFilter}
+            onChange={(event) => setApprovalFilter(event.target.value)}
+            className="rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-muted outline-none transition focus:border-brand"
+          >
+            <option value="all">All approvals</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => void loadProfiles()}
+            className="rounded-md border border-line px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+          >
+            Refresh Users
+          </button>
+        </div>
       </div>
 
       {sortedProfiles.length === 0 ? (
@@ -1309,25 +1428,33 @@ export default function AdminPage() {
         </div>
       ) : null}
 
-      {sortedProfiles.length > 0 ? (
+      {sortedProfiles.length > 0 && filteredProfiles.length === 0 ? (
+        <div className="mt-5 rounded-md border border-dashed border-line p-5 text-sm text-muted">
+          No profiles match this approval filter.
+        </div>
+      ) : null}
+
+      {filteredProfiles.length > 0 ? (
         <div className="mt-5 overflow-x-auto rounded-md border border-line bg-white/60">
-          <div className="min-w-[980px] divide-y divide-line">
-            <div className="grid grid-cols-[1.1fr_1.2fr_0.8fr_1fr_1fr_0.8fr_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+          <div className="min-w-[1180px] divide-y divide-line">
+            <div className="grid grid-cols-[1.05fr_1.15fr_0.75fr_0.9fr_0.95fr_0.95fr_0.75fr_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
               <span>Name</span>
               <span>Email</span>
               <span>Role</span>
+              <span>Approval</span>
               <span>Affiliation</span>
               <span>Position</span>
               <span>Created</span>
-              <span className="text-right">Action</span>
+              <span className="text-right">Actions</span>
             </div>
-            {sortedProfiles.map((profile) => {
+            {filteredProfiles.map((profile) => {
               const draft = profileDrafts[profile.id] ?? toProfileForm(profile);
+              const approvalStatus = getApprovalStatus(profile);
 
               return (
                 <div
                   key={profile.id}
-                  className="grid grid-cols-[1.1fr_1.2fr_0.8fr_1fr_1fr_0.8fr_auto] gap-3 px-3 py-2 text-sm"
+                  className="grid grid-cols-[1.05fr_1.15fr_0.75fr_0.9fr_0.95fr_0.95fr_0.75fr_auto] gap-3 px-3 py-2 text-sm"
                 >
                   <input
                     value={draft.fullName}
@@ -1355,6 +1482,23 @@ export default function AdminPage() {
                     <option value="professor">professor</option>
                     <option value="admin">admin</option>
                   </select>
+                  <div className="space-y-1 py-1">
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] ${getApprovalBadgeClass(
+                        approvalStatus,
+                      )}`}
+                    >
+                      {approvalStatus}
+                    </span>
+                    {profile.signup_note ? (
+                      <p
+                        className="line-clamp-2 text-[0.68rem] leading-4 text-muted"
+                        title={profile.signup_note}
+                      >
+                        {profile.signup_note}
+                      </p>
+                    ) : null}
+                  </div>
                   <input
                     value={draft.affiliation}
                     onChange={(event) =>
@@ -1382,14 +1526,40 @@ export default function AdminPage() {
                   <p className="py-1.5 text-xs text-muted">
                     {formatDate(profile.created_at)}
                   </p>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void handleUpdateProfile(profile)}
-                    className="rounded-md border border-brand/30 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
-                  >
-                    Save
-                  </button>
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleUpdateProfile(profile)}
+                      className="rounded-md border border-brand/30 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                    >
+                      Save
+                    </button>
+                    {approvalStatus !== "approved" ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          void handleUpdateApprovalStatus(profile, "approved")
+                        }
+                        className="rounded-md border border-brand/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand-soft disabled:opacity-60"
+                      >
+                        Approve
+                      </button>
+                    ) : null}
+                    {approvalStatus !== "rejected" ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          void handleUpdateApprovalStatus(profile, "rejected")
+                        }
+                        className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}

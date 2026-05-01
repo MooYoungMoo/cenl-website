@@ -9,6 +9,28 @@ type PortalAuthGuardProps = {
   children: React.ReactNode;
 };
 
+type ApprovalProfile = {
+  approval_status: string | null;
+};
+
+async function getApprovalStatus(userId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("approval_status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Unable to check portal approval status:", error.message);
+    return null;
+  }
+
+  return (
+    ((data as ApprovalProfile | null)?.approval_status ?? null)?.toLowerCase() ??
+    null
+  );
+}
+
 export function PortalAuthGuard({ children }: PortalAuthGuardProps) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
@@ -16,22 +38,52 @@ export function PortalAuthGuard({ children }: PortalAuthGuardProps) {
 
   useEffect(() => {
     let mounted = true;
+    let approvalRedirecting = false;
+
+    const resolveSession = async (currentSession: Session | null) => {
+      if (!mounted) {
+        return;
+      }
+
+      if (!currentSession) {
+        setSession(null);
+        setLoading(false);
+        if (!approvalRedirecting) {
+          router.replace("/portal/login");
+        }
+        return;
+      }
+
+      const approvalStatus = await getApprovalStatus(currentSession.user.id);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (approvalStatus === "pending" || approvalStatus === "rejected") {
+        approvalRedirecting = true;
+        await supabase.auth.signOut();
+
+        if (!mounted) {
+          return;
+        }
+
+        setSession(null);
+        setLoading(false);
+        router.replace(`/portal/login?reason=${approvalStatus}`);
+        return;
+      }
+
+      setSession(currentSession);
+      setLoading(false);
+    };
 
     const loadSession = async () => {
       const {
         data: { session: currentSession },
       } = await supabase.auth.getSession();
 
-      if (!mounted) {
-        return;
-      }
-
-      setSession(currentSession);
-      setLoading(false);
-
-      if (!currentSession) {
-        router.replace("/portal/login");
-      }
+      await resolveSession(currentSession);
     };
 
     void loadSession();
@@ -39,12 +91,8 @@ export function PortalAuthGuard({ children }: PortalAuthGuardProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-      setLoading(false);
-
-      if (!currentSession) {
-        router.replace("/portal/login");
-      }
+      setLoading(true);
+      void resolveSession(currentSession);
     });
 
     return () => {

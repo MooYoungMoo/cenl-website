@@ -1,26 +1,61 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+
+type ApprovalProfile = {
+  approval_status: string | null;
+};
+
+async function getApprovalStatus(userId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("approval_status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Unable to check portal approval status:", error.message);
+    return null;
+  }
+
+  return (
+    ((data as ApprovalProfile | null)?.approval_status ?? null)?.toLowerCase() ??
+    null
+  );
+}
+
+function getLoginNotice() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const reason = new URLSearchParams(window.location.search).get("reason");
+
+  if (reason === "timeout") {
+    return "You were signed out due to inactivity.";
+  }
+
+  if (reason === "pending") {
+    return "Your account is waiting for professor/admin approval.";
+  }
+
+  if (reason === "rejected") {
+    return "Your access request was not approved. Please contact the lab administrator.";
+  }
+
+  return "";
+}
 
 export default function PortalLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [notice] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    const reason = new URLSearchParams(window.location.search).get("reason");
-
-    return reason === "timeout"
-      ? "You were signed out due to inactivity."
-      : "";
-  });
+  const [notice] = useState(getLoginNotice);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
@@ -37,6 +72,14 @@ export default function PortalLoginPage() {
       }
 
       if (session) {
+        const approvalStatus = await getApprovalStatus(session.user.id);
+
+        if (approvalStatus === "pending" || approvalStatus === "rejected") {
+          await supabase.auth.signOut();
+          router.replace(`/portal/login?reason=${approvalStatus}`);
+          return;
+        }
+
         router.replace("/portal");
         return;
       }
@@ -56,18 +99,29 @@ export default function PortalLoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    setLoading(false);
-
     if (signInError) {
+      setLoading(false);
       setError(signInError.message);
       return;
     }
 
+    if (data.user) {
+      const approvalStatus = await getApprovalStatus(data.user.id);
+
+      if (approvalStatus === "pending" || approvalStatus === "rejected") {
+        await supabase.auth.signOut();
+        setLoading(false);
+        router.replace(`/portal/login?reason=${approvalStatus}`);
+        return;
+      }
+    }
+
+    setLoading(false);
     router.replace("/portal");
     router.refresh();
   };
@@ -82,8 +136,8 @@ export default function PortalLoginPage() {
           Sign in to the CENL Lab Portal
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-8 text-muted">
-          Lab members can sign in with an email and password managed by Supabase
-          Auth. Database-backed portal workflows are not connected yet.
+          Lab members can sign in with an approved email and password managed by
+          Supabase Auth. New access requests are reviewed by a professor/admin.
         </p>
       </div>
       <div className="rounded-lg border border-line bg-[#16242d] p-8 text-white shadow-panel md:p-10">
@@ -91,7 +145,8 @@ export default function PortalLoginPage() {
           <LockKeyhole className="h-8 w-8 text-brand-soft" />
           <h2 className="mt-6 text-3xl font-semibold">CENL Member Login</h2>
           <p className="mt-3 text-sm leading-7 text-white/70">
-            Enter your lab portal email and password.
+            Enter your lab portal email and password. New members can request
+            access for professor/admin approval.
           </p>
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
             {notice ? (
@@ -138,6 +193,15 @@ export default function PortalLoginPage() {
               <ShieldCheck className="h-4 w-4" />
               {loading || checkingSession ? "Checking..." : "Sign In"}
             </button>
+            <p className="text-center text-sm text-white/70">
+              Need portal access?{" "}
+              <Link
+                href="/portal/signup"
+                className="font-semibold text-brand-soft underline-offset-4 transition hover:text-white hover:underline"
+              >
+                Request access
+              </Link>
+            </p>
           </form>
         </div>
       </div>
