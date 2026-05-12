@@ -40,7 +40,18 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
             <ContributionBadge contribution={paper.labContribution} />
           </div>
           <h2 className="mt-2 break-words text-base font-semibold leading-6 sm:text-lg sm:leading-7">
-            {paper.title}
+            {paper.doiUrl ? (
+              <a
+                href={paper.doiUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="transition hover:text-brand hover:underline hover:underline-offset-4"
+              >
+                {paper.title}
+              </a>
+            ) : (
+              paper.title
+            )}
           </h2>
           <p className="mt-1.5 break-words text-xs leading-5 text-muted sm:text-sm sm:leading-6">
             <HighlightedAuthors
@@ -51,18 +62,6 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
           <p className="mt-1 text-xs font-semibold text-foreground/75 sm:text-sm">
             {paper.journal} | {paper.year}
           </p>
-          {paper.doiUrl ? (
-            <a
-              href={paper.doiUrl}
-              className="mt-2 inline-flex break-all text-xs font-medium text-brand transition hover:text-foreground sm:text-sm"
-            >
-              DOI: {paper.doi}
-            </a>
-          ) : (
-            <p className="mt-2 text-xs font-medium text-muted sm:text-sm">
-              DOI: {paper.doi}
-            </p>
-          )}
           <p className="mt-2 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-muted sm:text-xs">
             Citations placeholder ready
           </p>
