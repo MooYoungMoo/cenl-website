@@ -717,8 +717,8 @@ export default function PortalResearchPage() {
           <h2 className="mt-4 text-3xl font-semibold">Research management</h2>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
             Maintain Supabase-backed ongoing projects and research directions
-            for the public Research page. Homepage research highlights remain
-            static for now.
+            for the public Research page. Visible research topics also appear
+            as compact highlights on the Home page.
           </p>
         </div>
         {!loading && userCanManageResearch ? (

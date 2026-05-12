@@ -12,12 +12,53 @@ import {
   type HomePageContent,
 } from "@/lib/home";
 import { fetchHomeMetrics } from "@/lib/home-metrics";
+import { fetchVisibleResearchTopics } from "@/lib/research";
 import { homeFeatureLinks, quickStats } from "@/lib/site-data";
+
+const researchIdentityCards = [
+  {
+    title: "Conductive Frameworks",
+    description:
+      "Conductive MOFs and porous materials for molecular recognition and charge transport.",
+  },
+  {
+    title: "Nanostructured Oxides",
+    description:
+      "Porous, hollow, and hierarchical oxide materials for high-reactivity sensing films.",
+  },
+  {
+    title: "Light-Activated Sensors",
+    description:
+      "Band-structure and photoactivation strategies for room-temperature gas sensing.",
+  },
+  {
+    title: "Gas Fingerprints",
+    description:
+      "Sensor arrays and pattern recognition for information-rich chemical sensing.",
+  },
+];
+
+type HomeResearchCard = {
+  title: string;
+  description: string;
+};
+
+function trimResearchDescription(value: string) {
+  const trimmed = value.trim();
+
+  if (trimmed.length <= 150) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, 147).trim()}...`;
+}
 
 export function HomePageContentSection() {
   const [content, setContent] =
     useState<HomePageContent>(fallbackHomeContent);
   const [metrics, setMetrics] = useState(quickStats);
+  const [researchCards, setResearchCards] =
+    useState<HomeResearchCard[]>(researchIdentityCards);
 
   useEffect(() => {
     let mounted = true;
@@ -53,6 +94,28 @@ export function HomePageContentSection() {
     };
 
     void loadHomeMetrics();
+
+    const loadResearchCards = async () => {
+      try {
+        const topics = await fetchVisibleResearchTopics();
+        const nextCards = topics.slice(0, 4).map((topic) => ({
+          title: topic.title,
+          description: trimResearchDescription(
+            topic.subtitle || topic.summary || topic.description,
+          ),
+        }));
+
+        if (mounted && nextCards.length > 0) {
+          setResearchCards(nextCards);
+        }
+      } catch {
+        if (mounted) {
+          setResearchCards(researchIdentityCards);
+        }
+      }
+    };
+
+    void loadResearchCards();
 
     return () => {
       mounted = false;
@@ -123,6 +186,42 @@ export function HomePageContentSection() {
       </section>
 
       <LatestPublicationsSection title={content.latestPublicationsTitle} />
+
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
+        <div className="rounded-xl border border-line/70 bg-white/75 p-5 shadow-panel sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+                Research Directions
+              </p>
+              <h2 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">
+                From Molecules to Gas Fingerprints
+              </h2>
+            </div>
+            <Link
+              href="/research"
+              className="rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+            >
+              Explore research
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {researchCards.map((card) => (
+              <div
+                key={card.title}
+                className="rounded-lg border border-line/70 bg-surface/85 p-4"
+              >
+                <h3 className="line-clamp-1 text-sm font-semibold text-foreground">
+                  {card.title}
+                </h3>
+                <p className="mt-2 line-clamp-2 text-xs leading-6 text-muted">
+                  {card.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <LatestNewsSection title={content.latestNewsTitle} />
 

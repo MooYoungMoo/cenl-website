@@ -40,13 +40,13 @@ export function LatestPublicationsSection({
   }, []);
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-9 sm:px-6 md:py-12">
+    <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
       <SectionHeading
         eyebrow="Publications"
         title={title}
-        description="A compact carousel highlights recent CENL papers while keeping journal information easy to scan."
+        description="A concise preview of recent CENL papers with journal information kept easy to scan."
       />
-      <div className="mt-5">
+      <div className="mt-3">
         <PublicationCarousel items={items} />
       </div>
     </section>
