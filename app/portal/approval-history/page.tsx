@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase/client";
 
 type CostCategory = "materials" | "activities";
 
+type RequestKind = "materials" | "activities";
+
 type PurchaseStatus = "pending_payment" | "paid" | "canceled";
 
 type Merchant = {
@@ -16,11 +18,25 @@ type Merchant = {
   needs_review: boolean | null;
 };
 
+type ActivityGroup = {
+  id: string;
+  name: string;
+  normalized_name: string;
+  activity_type: string | null;
+  needs_review: boolean | null;
+};
+
 type PurchaseRequest = {
   id: string;
   requester_id: string;
+  request_kind: RequestKind | string | null;
   merchant: string | null;
   merchant_id: string | null;
+  activity_type: string | null;
+  activity_group_name: string | null;
+  activity_group_id: string | null;
+  request_date: string | null;
+  activity_detail: string | null;
   item_name: string;
   cost_category: CostCategory | null;
   item_url: string | null;
@@ -58,18 +74,28 @@ type FundingSourceManager = {
   user_id: string;
 };
 
-type MerchantGroup = {
+type RequestGroup = {
   key: string;
   merchantId: string | null;
-  merchantName: string;
+  groupName: string;
+  groupType: RequestKind;
+  activityType?: string | null;
   needsReview: boolean;
   requests: PurchaseRequest[];
 };
 
+type PaidGroupSummary = {
+  latestDate: string | null;
+  total: string;
+};
+
 const requestSelect =
-  "id, requester_id, merchant, merchant_id, item_name, cost_category, item_url, purpose, estimated_cost, currency, status, payment_note, funding_source_id, requested_at, paid_at, created_at, updated_at";
+  "id, requester_id, request_kind, merchant, merchant_id, activity_type, activity_group_name, activity_group_id, request_date, activity_detail, item_name, cost_category, item_url, purpose, estimated_cost, currency, status, payment_note, funding_source_id, requested_at, paid_at, created_at, updated_at";
 
 const merchantSelect = "id, name, normalized_name, needs_review";
+
+const activityGroupSelect =
+  "id, name, normalized_name, activity_type, needs_review";
 
 function normalizeMerchantName(value: string) {
   return value
@@ -77,6 +103,28 @@ function normalizeMerchantName(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeActivityGroupName(value: string) {
+  return normalizeMerchantName(value);
+}
+
+function formatActivityType(value: string | null | undefined) {
+  if (!value) {
+    return "Activity";
+  }
+
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) =>
+    letter.toUpperCase(),
+  );
+}
+
+function isActivityRequest(request: PurchaseRequest) {
+  return (
+    request.request_kind === "activities" ||
+    request.cost_category === "activities" ||
+    Boolean(request.activity_group_id || request.activity_group_name)
+  );
 }
 
 function formatDate(value: string | null) {
@@ -125,6 +173,34 @@ function getRequestMerchantName(
   return request.merchant || "Unknown merchant";
 }
 
+function getRequestActivityGroupName(
+  request: PurchaseRequest,
+  activityGroupMap: Record<string, ActivityGroup>,
+) {
+  if (
+    request.activity_group_id &&
+    activityGroupMap[request.activity_group_id]
+  ) {
+    return activityGroupMap[request.activity_group_id].name;
+  }
+
+  return request.activity_group_name || request.merchant || "Unknown activity";
+}
+
+function getRequestGroupName(
+  request: PurchaseRequest,
+  merchantMap: Record<string, Merchant>,
+  activityGroupMap: Record<string, ActivityGroup>,
+) {
+  return isActivityRequest(request)
+    ? getRequestActivityGroupName(request, activityGroupMap)
+    : getRequestMerchantName(request, merchantMap);
+}
+
+function getRequestDisplayDate(request: PurchaseRequest) {
+  return request.request_date || request.requested_at;
+}
+
 function getGroupTotal(requests: PurchaseRequest[]) {
   const totals = requests.reduce<Record<string, number>>((accumulator, request) => {
     const currency = request.currency || "KRW";
@@ -142,26 +218,77 @@ function getPaidGroupTotal(requests: PurchaseRequest[]) {
   return getGroupTotal(requests.filter((request) => request.status === "paid"));
 }
 
-function groupRequestsByMerchant(
+function getGroupLabel(group: RequestGroup) {
+  return group.groupName;
+}
+
+function getRequestSortDate(request: PurchaseRequest) {
+  return request.paid_at || getRequestDisplayDate(request) || request.created_at;
+}
+
+function getRequestHistoryYear(request: PurchaseRequest) {
+  const date =
+    request.request_date || request.paid_at || request.created_at || request.requested_at;
+  return date ? date.slice(0, 4) : "Unknown";
+}
+
+function getPaidGroupSummary(group: RequestGroup): PaidGroupSummary {
+  const latestDate =
+    group.requests
+      .map((request) => getRequestSortDate(request))
+      .filter((value): value is string => Boolean(value))
+      .sort((first, second) => second.localeCompare(first))[0] ?? null;
+
+  return {
+    latestDate,
+    total: getPaidGroupTotal(group.requests) || "0 KRW",
+  };
+}
+
+function groupRequestsByEntity(
   requests: PurchaseRequest[],
   merchantMap: Record<string, Merchant>,
+  activityGroupMap: Record<string, ActivityGroup>,
 ) {
-  const grouped = requests.reduce<Record<string, MerchantGroup>>(
+  const grouped = requests.reduce<Record<string, RequestGroup>>(
     (accumulator, request) => {
-      const merchantRecord = request.merchant_id
-        ? merchantMap[request.merchant_id]
-        : undefined;
-      const merchantName = getRequestMerchantName(request, merchantMap);
-      const fallbackKey = normalizeMerchantName(merchantName) || "unknown";
-      const key = request.merchant_id
-        ? `merchant:${request.merchant_id}`
-        : `text:${fallbackKey}`;
+      const activity = isActivityRequest(request);
+      const merchantRecord =
+        !activity && request.merchant_id
+          ? merchantMap[request.merchant_id]
+          : undefined;
+      const activityGroupRecord =
+        activity && request.activity_group_id
+          ? activityGroupMap[request.activity_group_id]
+          : undefined;
+      const groupName = getRequestGroupName(
+        request,
+        merchantMap,
+        activityGroupMap,
+      );
+      const fallbackKey =
+        (activity
+          ? normalizeActivityGroupName(groupName)
+          : normalizeMerchantName(groupName)) || "unknown";
+      const activityType =
+        request.activity_type || activityGroupRecord?.activity_type || "other";
+      const key = activity
+        ? request.activity_group_id
+          ? `activity:${activityType}:${request.activity_group_id}`
+          : `activity:${activityType}:text:${fallbackKey}`
+        : request.merchant_id
+          ? `merchant:${request.merchant_id}`
+          : `merchant:text:${fallbackKey}`;
 
       accumulator[key] ??= {
         key,
         merchantId: request.merchant_id,
-        merchantName,
-        needsReview: Boolean(merchantRecord?.needs_review),
+        groupName,
+        groupType: activity ? "activities" : "materials",
+        activityType,
+        needsReview: activity
+          ? Boolean(activityGroupRecord?.needs_review)
+          : Boolean(merchantRecord?.needs_review),
         requests: [],
       };
       accumulator[key].requests.push(request);
@@ -179,6 +306,9 @@ export default function PaymentTrackerPage() {
     Record<string, Profile>
   >({});
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
+  const [activityGroupMap, setActivityGroupMap] = useState<
+    Record<string, ActivityGroup>
+  >({});
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [selectedFundingSourceId, setSelectedFundingSourceId] = useState("");
@@ -192,6 +322,10 @@ export default function PaymentTrackerPage() {
   const [fundingLoading, setFundingLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [undoingRequestId, setUndoingRequestId] = useState<string | null>(null);
+  const [expandedPaidGroupKeys, setExpandedPaidGroupKeys] = useState<string[]>(
+    [],
+  );
+  const [paidYearFilter, setPaidYearFilter] = useState("all");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -261,6 +395,13 @@ export default function PaymentTrackerPage() {
           .filter((id): id is string => Boolean(id)),
       ),
     );
+    const activityGroupIds = Array.from(
+      new Set(
+        requestRows
+          .map((request) => request.activity_group_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
 
     if (requesterIds.length > 0) {
       const { data: profiles } = await supabase
@@ -297,6 +438,24 @@ export default function PaymentTrackerPage() {
     } else {
       setMerchantMap({});
     }
+
+    if (activityGroupIds.length > 0) {
+      const { data: activityGroups } = await supabase
+        .from("activity_groups")
+        .select(activityGroupSelect)
+        .in("id", activityGroupIds);
+
+      const nextActivityGroups = (
+        (activityGroups ?? []) as ActivityGroup[]
+      ).reduce<Record<string, ActivityGroup>>((accumulator, group) => {
+        accumulator[group.id] = group;
+        return accumulator;
+      }, {});
+
+      setActivityGroupMap(nextActivityGroups);
+    } else {
+      setActivityGroupMap({});
+    }
   }, []);
 
   const loadRequests = useCallback(async () => {
@@ -309,6 +468,7 @@ export default function PaymentTrackerPage() {
       setRequests([]);
       setRequesterProfiles({});
       setMerchantMap({});
+      setActivityGroupMap({});
       setErrorMessage(error.message);
       return;
     }
@@ -372,20 +532,82 @@ export default function PaymentTrackerPage() {
 
   const pendingGroups = useMemo(
     () =>
-      groupRequestsByMerchant(
-        requests.filter((request) => request.status === "pending_payment"),
+      groupRequestsByEntity(
+        requests
+          .filter((request) => request.status === "pending_payment")
+          .sort((first, second) => {
+            const firstDate =
+              getRequestDisplayDate(first) || first.created_at || "";
+            const secondDate =
+              getRequestDisplayDate(second) || second.created_at || "";
+            return firstDate.localeCompare(secondDate);
+          }),
         merchantMap,
+        activityGroupMap,
       ),
-    [merchantMap, requests],
+    [activityGroupMap, merchantMap, requests],
+  );
+
+  const paidYears = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          requests
+            .filter((request) => request.status === "paid")
+            .map((request) => getRequestHistoryYear(request)),
+        ),
+      ).sort((first, second) => second.localeCompare(first)),
+    [requests],
   );
 
   const paidGroups = useMemo(
     () =>
-      groupRequestsByMerchant(
-        requests.filter((request) => request.status === "paid"),
+      groupRequestsByEntity(
+        requests
+          .filter(
+            (request) =>
+              request.status === "paid" &&
+              (paidYearFilter === "all" ||
+                getRequestHistoryYear(request) === paidYearFilter),
+          )
+          .sort((first, second) => {
+            const firstDate =
+              first.paid_at || getRequestDisplayDate(first) || first.created_at || "";
+            const secondDate =
+              second.paid_at ||
+              getRequestDisplayDate(second) ||
+              second.created_at ||
+              "";
+            return secondDate.localeCompare(firstDate);
+          }),
         merchantMap,
-      ),
-    [merchantMap, requests],
+        activityGroupMap,
+      ).sort((first, second) => {
+        const firstDate = getPaidGroupSummary(first).latestDate ?? "";
+        const secondDate = getPaidGroupSummary(second).latestDate ?? "";
+        return secondDate.localeCompare(firstDate);
+      }),
+    [activityGroupMap, merchantMap, paidYearFilter, requests],
+  );
+
+  const pendingMaterialsGroups = useMemo(
+    () => pendingGroups.filter((group) => group.groupType === "materials"),
+    [pendingGroups],
+  );
+
+  const pendingActivityGroups = useMemo(
+    () => pendingGroups.filter((group) => group.groupType === "activities"),
+    [pendingGroups],
+  );
+
+  const paidMaterialsGroups = useMemo(
+    () => paidGroups.filter((group) => group.groupType === "materials"),
+    [paidGroups],
+  );
+
+  const paidActivityGroups = useMemo(
+    () => paidGroups.filter((group) => group.groupType === "activities"),
+    [paidGroups],
   );
 
   const toggleRequest = (requestId: string) => {
@@ -396,7 +618,7 @@ export default function PaymentTrackerPage() {
     );
   };
 
-  const toggleMerchantGroup = (group: MerchantGroup) => {
+  const toggleRequestGroup = (group: RequestGroup) => {
     const groupIds = group.requests.map((request) => request.id);
     const allSelected = groupIds.every((id) => selectedRequestIds.includes(id));
 
@@ -404,6 +626,14 @@ export default function PaymentTrackerPage() {
       allSelected
         ? current.filter((id) => !groupIds.includes(id))
         : Array.from(new Set([...current, ...groupIds])),
+    );
+  };
+
+  const togglePaidGroup = (groupKey: string) => {
+    setExpandedPaidGroupKeys((current) =>
+      current.includes(groupKey)
+        ? current.filter((key) => key !== groupKey)
+        : [...current, groupKey],
     );
   };
 
@@ -468,10 +698,10 @@ export default function PaymentTrackerPage() {
       selectedRequestIds.includes(request.id),
     );
     const selectedFundingSource = fundingSourceMap[selectedFundingSourceId];
-    const merchantNames = Array.from(
+    const groupNames = Array.from(
       new Set(
         selectedRequests.map((request) =>
-          getRequestMerchantName(request, merchantMap),
+          getRequestGroupName(request, merchantMap, activityGroupMap),
         ),
       ),
     );
@@ -487,7 +717,7 @@ export default function PaymentTrackerPage() {
         request_ids: selectedRequestIds,
         funding_source_id: selectedFundingSourceId,
         funding_source_name: selectedFundingSource?.name ?? null,
-        merchant_names: merchantNames,
+        group_names: groupNames,
         total_amount: getGroupTotal(selectedRequests),
         payment_note: trimmedNote || null,
       },
@@ -553,7 +783,15 @@ export default function PaymentTrackerPage() {
       metadata: {
         request_id: request.id,
         item_name: request.item_name,
-        merchant: getRequestMerchantName(request, merchantMap),
+        group_name: getRequestGroupName(request, merchantMap, activityGroupMap),
+        merchant: isActivityRequest(request)
+          ? null
+          : getRequestMerchantName(request, merchantMap),
+        activity_group: isActivityRequest(request)
+          ? getRequestActivityGroupName(request, activityGroupMap)
+          : null,
+        activity_type: request.activity_type,
+        activity_detail: request.activity_detail,
         funding_source_id: request.funding_source_id,
         funding_source_name: request.funding_source_id
           ? fundingSourceMap[request.funding_source_id]?.name ?? null
@@ -569,24 +807,67 @@ export default function PaymentTrackerPage() {
     await loadRequests();
   };
 
+  const renderGroupHeader = (group: RequestGroup) => (
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
+      <span
+        className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+          group.groupType === "materials"
+            ? "border-brand/20 bg-brand-soft text-brand"
+            : "border-cyan-200 bg-cyan-50 text-cyan-700"
+        }`}
+      >
+        {group.groupType === "materials" ? "Materials" : "Activities"}
+      </span>
+      {group.groupType === "activities" ? (
+        <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.72rem] font-semibold text-muted">
+          {formatActivityType(group.activityType)}
+        </span>
+      ) : null}
+      <span className="min-w-0 truncate text-lg font-semibold text-foreground">
+        {getGroupLabel(group)}
+      </span>
+    </span>
+  );
+
+  const renderYearTabs = () => (
+    <div className="mt-4 overflow-x-auto">
+      <div className="flex min-w-max gap-2">
+        {["all", ...paidYears].map((year) => (
+          <button
+            key={year}
+            type="button"
+            onClick={() => setPaidYearFilter(year)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              paidYearFilter === year
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-white text-muted hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+            }`}
+          >
+            {year === "all" ? "All" : year}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <PortalShell
       title="Payment Tracker"
-      description="Group Pending Payment items by Merchant and record Paid expenses."
+      description="Group Pending Payment items by Merchant or Activity Group and record Paid expenses."
     >
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
         Payment Tracker
       </p>
       <h2 className="mt-4 text-3xl font-semibold">
-        Merchant-based Pending Payments
+        Pending Payments by Merchant and Activity Group
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
-        Pending Payment items are grouped by Merchant identity when available, with
-        older text-only rows grouped by normalized merchant text.
+        Materials are grouped by Merchant. Activities are grouped by Activity
+        Group so conferences, analyses, and lab activities stay easy to scan.
       </p>
       <p className="mt-2 max-w-3xl text-xs leading-6 text-muted">
-        New merchants are marked as Needs review until a professor/admin
-        confirms the merchant name.
+        New merchants and activity groups are marked as Needs review until a
+        professor/admin confirms the name.
       </p>
 
       {!loading && !userCanManagePayments ? (
@@ -675,7 +956,7 @@ export default function PaymentTrackerPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Pending Payments by Merchant
+              Pending Payments
             </p>
             <h3 className="mt-2 text-2xl font-semibold">
               Pending Payment queue
@@ -703,8 +984,30 @@ export default function PaymentTrackerPage() {
         ) : null}
 
         {!loading && pendingGroups.length > 0 ? (
-          <div className="mt-5 grid gap-4">
-            {pendingGroups.map((group) => {
+          <div className="mt-5 grid gap-5">
+            {[
+              {
+                title: "Pending Materials",
+                groups: pendingMaterialsGroups,
+                empty: "No pending materials.",
+              },
+              {
+                title: "Pending Activities",
+                groups: pendingActivityGroups,
+                empty: "No pending activities.",
+              },
+            ].map((section) => (
+              <section key={section.title}>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                  {section.title}
+                </p>
+                {section.groups.length === 0 ? (
+                  <div className="mt-3 rounded-md border border-dashed border-line p-4 text-sm text-muted">
+                    {section.empty}
+                  </div>
+                ) : null}
+                <div className="mt-3 grid gap-4">
+            {section.groups.map((group) => {
               const groupIds = group.requests.map((request) => request.id);
               const allSelected = groupIds.every((id) =>
                 selectedRequestIds.includes(id),
@@ -728,9 +1031,7 @@ export default function PaymentTrackerPage() {
                           </span>
                         ) : null}
                       </div>
-                      <h4 className="mt-1 text-xl font-semibold">
-                        {group.merchantName}
-                      </h4>
+                      <div className="mt-1">{renderGroupHeader(group)}</div>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted">Pending total</p>
@@ -743,10 +1044,10 @@ export default function PaymentTrackerPage() {
                   {userCanManagePayments ? (
                     <button
                       type="button"
-                      onClick={() => toggleMerchantGroup(group)}
+                      onClick={() => toggleRequestGroup(group)}
                       className="mt-3 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
                     >
-                      {allSelected ? "Clear merchant selection" : "Select merchant items"}
+                      {allSelected ? "Clear group selection" : "Select group items"}
                     </button>
                   ) : null}
 
@@ -777,12 +1078,21 @@ export default function PaymentTrackerPage() {
                                   request.requester_id,
                                 )}
                               </p>
+                              <p className="mt-0.5 text-xs text-muted">
+                                {formatDate(getRequestDisplayDate(request))}
+                                {isActivityRequest(request) &&
+                                request.activity_detail
+                                  ? ` - ${request.activity_detail}`
+                                  : ""}
+                              </p>
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2 text-xs">
                             <span className="rounded-md bg-brand-soft px-2 py-1 font-semibold capitalize text-brand">
-                              {request.cost_category || "uncategorized"}
+                              {isActivityRequest(request)
+                                ? formatActivityType(request.activity_type)
+                                : request.cost_category || "uncategorized"}
                             </span>
                             <span className="rounded-md bg-white px-2 py-1 font-semibold text-muted">
                               {formatCost(
@@ -826,6 +1136,9 @@ export default function PaymentTrackerPage() {
                 </article>
               );
             })}
+                </div>
+              </section>
+            ))}
           </div>
         ) : null}
       </section>
@@ -833,41 +1146,103 @@ export default function PaymentTrackerPage() {
       {!loading && paidGroups.length > 0 ? (
         <section className="mt-10">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-            Paid by Merchant
+            Paid Request History
           </p>
           <h3 className="mt-2 text-2xl font-semibold">
             Paid request history
           </h3>
-          <div className="mt-5 grid gap-3">
-            {paidGroups.map((group) => (
+          {renderYearTabs()}
+          <div className="mt-5 grid gap-5">
+            {[
+              {
+                title: "Paid Materials",
+                groups: paidMaterialsGroups,
+                empty: "No paid materials yet.",
+              },
+              {
+                title: "Paid Activities",
+                groups: paidActivityGroups,
+                empty: "No paid activities yet.",
+              },
+            ].map((section) => (
+              <section key={section.title}>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                  {section.title}
+                </p>
+                {section.groups.length === 0 ? (
+                  <div className="mt-3 rounded-md border border-dashed border-line p-4 text-sm text-muted">
+                    {section.empty}
+                  </div>
+                ) : null}
+                <div className="mt-3 grid gap-3">
+            {section.groups.map((group) => (
               <article
                 key={group.key}
-                className="rounded-md border border-line bg-white/60 p-3"
+                className="rounded-md border border-line bg-white/60"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => togglePaidGroup(group.key)}
+                  className="flex w-full flex-wrap items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-brand-soft/50"
+                  aria-expanded={expandedPaidGroupKeys.includes(group.key)}
+                >
                   <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="font-semibold">{group.merchantName}</h4>
+                    <h4 className="font-semibold">
+                      {expandedPaidGroupKeys.includes(group.key) ? "v" : ">"}
+                      {" "}
+                      <span className="inline-flex align-middle">
+                        {renderGroupHeader(group)}
+                      </span>
+                    </h4>
+                    <h4 className="hidden">
+                      {group.groupType === "activities"
+                        ? `${formatActivityType(group.activityType)} · ${group.groupName}`
+                        : group.groupName}
+                    </h4>
                     {group.needsReview ? (
                       <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
                         Needs review
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-sm font-semibold text-muted">
-                    Paid total: {getPaidGroupTotal(group.requests) || "0 KRW"}
+                  <p className="text-sm font-semibold text-brand">
+                    {group.requests.length} paid request
+                    {group.requests.length === 1 ? "" : "s"} -{" "}
+                    {getPaidGroupSummary(group).total}
+                    {getPaidGroupSummary(group).latestDate
+                      ? ` - latest ${formatDate(
+                          getPaidGroupSummary(group).latestDate,
+                        )}`
+                      : ""}
                   </p>
-                </div>
+                </button>
 
-                <div className="mt-3 grid gap-2">
+                {expandedPaidGroupKeys.includes(group.key) ? (
+                <div className="grid gap-1.5 border-t border-line px-2.5 py-2">
                   {group.requests.map((request) => (
                     <div
                       key={request.id}
-                      className="grid gap-2 rounded-md bg-[#f7f9fb] px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
+                      className="grid gap-2 rounded-md bg-[#f7f9fb] px-2.5 py-1.5 text-[0.78rem] text-muted lg:grid-cols-[0.7fr_minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
                     >
+                      <p className="font-medium">
+                        {formatDate(getRequestDisplayDate(request))}
+                      </p>
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-foreground">
                           {request.item_name}
                         </p>
+                        <p className="mt-0.5 truncate">
+                          {getRequesterLabel(
+                            requesterProfiles[request.requester_id],
+                            request.requester_id,
+                          )}
+                        </p>
+                        {isActivityRequest(request) &&
+                        request.activity_detail ? (
+                          <p className="mt-0.5 truncate">
+                            Detail: {request.activity_detail}
+                          </p>
+                        ) : null}
                         {request.payment_note ? (
                           <p className="mt-0.5 truncate">
                             Note: {request.payment_note}
@@ -898,19 +1273,34 @@ export default function PaymentTrackerPage() {
                             type="button"
                             disabled={undoingRequestId === request.id}
                             onClick={() => void handleUndoPayment(request)}
-                            className="rounded-md border border-line bg-white px-2 py-1 font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-md border border-line bg-white px-2 py-0.5 text-[0.72rem] font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {undoingRequestId === request.id
                               ? "Undoing..."
-                              : "Undo Payment"}
+                              : "Undo"}
                           </button>
                         ) : null}
                       </div>
                     </div>
                   ))}
                 </div>
+                ) : null}
               </article>
             ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {!loading && paidGroups.length === 0 && !errorMessage ? (
+        <section className="mt-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+            Paid Request History
+          </p>
+          <div className="portal-card mt-5 rounded-md border border-dashed border-line p-5 text-sm text-muted">
+            No paid requests yet.
           </div>
         </section>
       ) : null}

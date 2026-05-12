@@ -7,6 +7,10 @@ import { supabase } from "@/lib/supabase/client";
 
 type CostCategory = "materials" | "activities";
 
+type RequestKind = "materials" | "activities";
+
+type ActivityType = "conference" | "analysis" | "other";
+
 type PurchaseStatus = "pending_payment" | "paid" | "canceled";
 
 type Merchant = {
@@ -27,11 +31,30 @@ type FundingSource = {
   name: string;
 };
 
+type ActivityGroup = {
+  id: string;
+  name: string;
+  normalized_name: string;
+  activity_type: ActivityType | string | null;
+  is_active: boolean | null;
+  needs_review: boolean | null;
+  note: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 type PurchaseRequest = {
   id: string;
   requester_id: string;
+  request_kind: RequestKind | string | null;
   merchant: string | null;
   merchant_id: string | null;
+  activity_type: ActivityType | string | null;
+  activity_group_name: string | null;
+  activity_group_id: string | null;
+  request_date: string | null;
+  activity_detail: string | null;
   item_name: string;
   cost_category: CostCategory | null;
   item_url: string | null;
@@ -47,16 +70,27 @@ type PurchaseRequest = {
   updated_at: string | null;
 };
 
-type MerchantGroup = {
+type RequestGroup = {
   key: string;
-  merchantName: string;
+  groupName: string;
+  groupType: RequestKind;
+  activityType?: string | null;
   needsReview: boolean;
   requests: PurchaseRequest[];
 };
 
+type PaidGroupSummary = {
+  latestDate: string | null;
+  total: string;
+};
+
 type PurchaseRequestForm = {
+  requestKind: RequestKind;
+  requestDate: string;
   itemName: string;
   costCategory: CostCategory;
+  activityType: ActivityType;
+  activityDetail: string;
   estimatedCost: string;
   currency: string;
   purpose: string;
@@ -64,33 +98,83 @@ type PurchaseRequestForm = {
   itemUrl: string;
 };
 
-const initialForm: PurchaseRequestForm = {
-  itemName: "",
-  costCategory: "materials",
-  estimatedCost: "",
-  currency: "KRW",
-  purpose: "",
-  paymentNote: "",
-  itemUrl: "",
-};
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getInitialForm(): PurchaseRequestForm {
+  return {
+    requestKind: "materials",
+    requestDate: todayInputValue(),
+    itemName: "",
+    costCategory: "materials",
+    activityType: "conference",
+    activityDetail: "",
+    estimatedCost: "",
+    currency: "KRW",
+    purpose: "",
+    paymentNote: "",
+    itemUrl: "",
+  };
+}
+
+const initialForm: PurchaseRequestForm = getInitialForm();
+
+const activityGroupSelect =
+  "id, name, normalized_name, activity_type, is_active, needs_review, note, created_by, created_at, updated_at";
 
 const merchantSelect =
   "id, name, normalized_name, website, note, is_active, needs_review, created_by, created_at, updated_at";
 
 const requestSelect =
-  "id, requester_id, merchant, merchant_id, item_name, cost_category, item_url, purpose, estimated_cost, currency, status, payment_note, funding_source_id, requested_at, paid_at, created_at, updated_at";
+  "id, requester_id, request_kind, merchant, merchant_id, activity_type, activity_group_name, activity_group_id, request_date, activity_detail, item_name, cost_category, item_url, purpose, estimated_cost, currency, status, payment_note, funding_source_id, requested_at, paid_at, created_at, updated_at";
 
 const fundingSourceSelect = "id, name";
 
 const inactiveMerchantMessage =
   "This merchant exists but is inactive. Please ask an admin to reactivate or rename it.";
 
-function normalizeMerchantName(value: string) {
+const inactiveActivityGroupMessage =
+  "This activity group exists but is inactive. Please ask an admin to reactivate or rename it.";
+
+const activityTypeOptions: ActivityType[] = ["conference", "analysis", "other"];
+
+const activityItemExamples =
+  "registration_fee, flight, accommodation, meal, analysis_fee, other";
+
+function normalizeRecordName(value: string) {
   return value
+    .normalize("NFKC")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeMerchantName(value: string) {
+  return normalizeRecordName(value);
+}
+
+function normalizeActivityGroupName(value: string) {
+  return normalizeRecordName(value);
+}
+
+function formatActivityType(value: string | null | undefined) {
+  if (!value) {
+    return "Activity";
+  }
+
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) =>
+    letter.toUpperCase(),
+  );
+}
+
+function isActivityRequest(request: PurchaseRequest) {
+  return (
+    request.request_kind === "activities" ||
+    request.cost_category === "activities" ||
+    Boolean(request.activity_group_id || request.activity_group_name)
+  );
 }
 
 function formatDate(value: string | null) {
@@ -128,6 +212,33 @@ function formatGroupTotal(requests: PurchaseRequest[]) {
     .join(" / ");
 }
 
+function getGroupLabel(group: RequestGroup) {
+  return group.groupName;
+}
+
+function getRequestSortDate(request: PurchaseRequest) {
+  return request.paid_at || request.request_date || request.requested_at || request.created_at;
+}
+
+function getRequestHistoryYear(request: PurchaseRequest) {
+  const date =
+    request.request_date || request.paid_at || request.created_at || request.requested_at;
+  return date ? date.slice(0, 4) : "Unknown";
+}
+
+function getPaidGroupSummary(group: RequestGroup): PaidGroupSummary {
+  const latestDate =
+    group.requests
+      .map((request) => getRequestSortDate(request))
+      .filter((value): value is string => Boolean(value))
+      .sort((first, second) => second.localeCompare(first))[0] ?? null;
+
+  return {
+    latestDate,
+    total: formatGroupTotal(group.requests) || "0 KRW",
+  };
+}
+
 function FieldLabel({
   children,
   required = false,
@@ -152,18 +263,33 @@ export function PurchaseRequestPanel() {
   const [merchantDropdownOpen, setMerchantDropdownOpen] = useState(false);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
+  const [activityGroupSearch, setActivityGroupSearch] = useState("");
+  const [selectedActivityGroup, setSelectedActivityGroup] =
+    useState<ActivityGroup | null>(null);
+  const [activityGroupDropdownOpen, setActivityGroupDropdownOpen] =
+    useState(false);
+  const [activityGroups, setActivityGroups] = useState<ActivityGroup[]>([]);
+  const [activityGroupMap, setActivityGroupMap] = useState<
+    Record<string, ActivityGroup>
+  >({});
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [merchantsLoading, setMerchantsLoading] = useState(true);
+  const [activityGroupsLoading, setActivityGroupsLoading] = useState(true);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [addingMerchant, setAddingMerchant] = useState(false);
+  const [addingActivityGroup, setAddingActivityGroup] = useState(false);
   const [cancelingRequestId, setCancelingRequestId] = useState<string | null>(
     null,
   );
+  const [expandedPaidGroupKeys, setExpandedPaidGroupKeys] = useState<string[]>(
+    [],
+  );
+  const [paidYearFilter, setPaidYearFilter] = useState("all");
 
   const fundingSourceMap = useMemo(
     () =>
@@ -204,6 +330,34 @@ export function PurchaseRequestPanel() {
     setMerchantsLoading(false);
   }, []);
 
+  const loadActivityGroups = useCallback(async () => {
+    setActivityGroupsLoading(true);
+
+    const { data, error } = await supabase
+      .from("activity_groups")
+      .select(activityGroupSelect)
+      .eq("is_active", true)
+      .order("activity_type", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) {
+      setSubmitError(error.message);
+      setActivityGroups([]);
+    } else {
+      const nextGroups = (data ?? []) as ActivityGroup[];
+      setActivityGroups(nextGroups);
+      setActivityGroupMap((current) => {
+        const nextMap = { ...current };
+        nextGroups.forEach((group) => {
+          nextMap[group.id] = group;
+        });
+        return nextMap;
+      });
+    }
+
+    setActivityGroupsLoading(false);
+  }, []);
+
   const loadFundingSources = useCallback(async () => {
     const { data } = await supabase
       .from("funding_sources")
@@ -242,6 +396,38 @@ export function PurchaseRequestPanel() {
     });
   }, []);
 
+  const loadRequestActivityGroups = useCallback(
+    async (requestRows: PurchaseRequest[]) => {
+      const groupIds = Array.from(
+        new Set(
+          requestRows
+            .map((request) => request.activity_group_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+
+      if (groupIds.length === 0) {
+        return;
+      }
+
+      const { data } = await supabase
+        .from("activity_groups")
+        .select(activityGroupSelect)
+        .in("id", groupIds);
+
+      const nextGroups = (data ?? []) as ActivityGroup[];
+
+      setActivityGroupMap((current) => {
+        const nextMap = { ...current };
+        nextGroups.forEach((group) => {
+          nextMap[group.id] = group;
+        });
+        return nextMap;
+      });
+    },
+    [],
+  );
+
   const loadRequests = useCallback(async () => {
     setRequestsLoading(true);
     setRequestsError("");
@@ -258,14 +444,16 @@ export function PurchaseRequestPanel() {
       const nextRequests = (data ?? []) as PurchaseRequest[];
       setRequests(nextRequests);
       await loadRequestMerchants(nextRequests);
+      await loadRequestActivityGroups(nextRequests);
     }
 
     setRequestsLoading(false);
-  }, [loadRequestMerchants]);
+  }, [loadRequestActivityGroups, loadRequestMerchants]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadMerchants();
+      void loadActivityGroups();
       void loadFundingSources();
       void loadRequests();
     }, 0);
@@ -273,7 +461,7 @@ export function PurchaseRequestPanel() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [loadFundingSources, loadMerchants, loadRequests]);
+  }, [loadActivityGroups, loadFundingSources, loadMerchants, loadRequests]);
 
   const filteredMerchants = useMemo(() => {
     const search = merchantSearch.trim().toLowerCase();
@@ -301,6 +489,33 @@ export function PurchaseRequestPanel() {
     searchedNormalizedName.length > 0 &&
     !exactMerchantExists;
 
+  const filteredActivityGroups = useMemo(() => {
+    const search = activityGroupSearch.trim().toLowerCase();
+    const normalizedSearch = normalizeActivityGroupName(activityGroupSearch);
+
+    return activityGroups
+      .filter((group) => group.activity_type === form.activityType)
+      .filter((group) =>
+        search
+          ? group.name.toLowerCase().includes(search) ||
+            group.normalized_name.includes(normalizedSearch)
+          : true,
+      )
+      .slice(0, search ? 8 : 6);
+  }, [activityGroupSearch, activityGroups, form.activityType]);
+
+  const searchedActivityNormalizedName =
+    normalizeActivityGroupName(activityGroupSearch);
+  const exactActivityGroupExists = activityGroups.some(
+    (group) =>
+      group.activity_type === form.activityType &&
+      group.normalized_name === searchedActivityNormalizedName,
+  );
+  const canAddActivityGroup =
+    activityGroupSearch.trim().length > 0 &&
+    searchedActivityNormalizedName.length > 0 &&
+    !exactActivityGroupExists;
+
   const updateForm = <Field extends keyof PurchaseRequestForm>(
     field: Field,
     value: PurchaseRequestForm[Field],
@@ -309,6 +524,16 @@ export function PurchaseRequestPanel() {
       ...current,
       [field]: value,
     }));
+  };
+
+  const switchRequestKind = (requestKind: RequestKind) => {
+    setForm((current) => ({
+      ...current,
+      requestKind,
+      costCategory: requestKind,
+    }));
+    setSubmitError("");
+    setSuccessMessage("");
   };
 
   const selectMerchant = (merchant: Merchant, message?: string) => {
@@ -332,6 +557,29 @@ export function PurchaseRequestPanel() {
     setSelectedMerchant(null);
     setMerchantSearch("");
     setMerchantDropdownOpen(true);
+  };
+
+  const selectActivityGroup = (group: ActivityGroup, message?: string) => {
+    setSelectedActivityGroup(group);
+    setActivityGroupSearch(group.name);
+    setActivityGroupDropdownOpen(false);
+    setSuccessMessage(message ?? "");
+    setSubmitError("");
+  };
+
+  const handleActivityGroupSearchChange = (value: string) => {
+    setActivityGroupSearch(value);
+    setActivityGroupDropdownOpen(true);
+
+    if (selectedActivityGroup && selectedActivityGroup.name !== value) {
+      setSelectedActivityGroup(null);
+    }
+  };
+
+  const clearSelectedActivityGroup = () => {
+    setSelectedActivityGroup(null);
+    setActivityGroupSearch("");
+    setActivityGroupDropdownOpen(true);
   };
 
   const handleAddMerchant = async () => {
@@ -468,6 +716,147 @@ export function PurchaseRequestPanel() {
     setAddingMerchant(false);
   };
 
+  const handleAddActivityGroup = async () => {
+    const name = activityGroupSearch.trim();
+    const normalizedName = normalizeActivityGroupName(name);
+    const activityType = form.activityType;
+
+    if (!name || !normalizedName) {
+      setSubmitError("Enter an activity group name before adding it.");
+      return;
+    }
+
+    setAddingActivityGroup(true);
+    setSubmitError("");
+    setSuccessMessage("");
+
+    const activeGroup = activityGroups.find(
+      (group) =>
+        group.activity_type === activityType &&
+        group.normalized_name === normalizedName,
+    );
+
+    if (activeGroup) {
+      selectActivityGroup(activeGroup, "Using existing activity group record.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    const { data: existingGroup } = await supabase
+      .from("activity_groups")
+      .select(activityGroupSelect)
+      .eq("activity_type", activityType)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+
+    if (existingGroup) {
+      const group = existingGroup as ActivityGroup;
+
+      if (group.is_active === false) {
+        setSelectedActivityGroup(null);
+        setSubmitError(inactiveActivityGroupMessage);
+        setAddingActivityGroup(false);
+        return;
+      }
+
+      selectActivityGroup(group, "Using existing activity group record.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setSubmitError("Please sign in again before adding an activity group.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("activity_groups")
+      .insert({
+        name,
+        normalized_name: normalizedName,
+        activity_type: activityType,
+        is_active: true,
+        needs_review: true,
+        created_by: user.id,
+      })
+      .select(activityGroupSelect)
+      .single();
+
+    if (!error && data) {
+      const newGroup = data as ActivityGroup;
+      setActivityGroups((current) => [...current, newGroup]);
+      setActivityGroupMap((current) => ({
+        ...current,
+        [newGroup.id]: newGroup,
+      }));
+      selectActivityGroup(newGroup, "New activity group added and selected.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    await loadActivityGroups();
+
+    const { data: matchingActiveGroup } = await supabase
+      .from("activity_groups")
+      .select(activityGroupSelect)
+      .eq("activity_type", activityType)
+      .eq("normalized_name", normalizedName)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (matchingActiveGroup) {
+      const group = matchingActiveGroup as ActivityGroup;
+      setActivityGroupMap((current) => ({
+        ...current,
+        [group.id]: group,
+      }));
+      selectActivityGroup(group, "Using existing activity group record.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    const { data: conflictingGroup } = await supabase
+      .from("activity_groups")
+      .select(activityGroupSelect)
+      .eq("activity_type", activityType)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+
+    if (conflictingGroup) {
+      const group = conflictingGroup as ActivityGroup;
+
+      if (group.is_active === false) {
+        setSelectedActivityGroup(null);
+        setSubmitError(inactiveActivityGroupMessage);
+        setAddingActivityGroup(false);
+        return;
+      }
+
+      setActivityGroupMap((current) => ({
+        ...current,
+        [group.id]: group,
+      }));
+      selectActivityGroup(group, "Using existing activity group record.");
+      setAddingActivityGroup(false);
+      return;
+    }
+
+    if (error?.message.toLowerCase().includes("duplicate")) {
+      setSubmitError(inactiveActivityGroupMessage);
+    } else {
+      setSubmitError(
+        error?.message ?? "Could not add this activity group. Please try again.",
+      );
+    }
+    setAddingActivityGroup(false);
+  };
+
   const getRequestMerchantName = (request: PurchaseRequest) => {
     if (request.merchant_id && merchantMap[request.merchant_id]) {
       return merchantMap[request.merchant_id].name;
@@ -484,19 +873,59 @@ export function PurchaseRequestPanel() {
     return Boolean(merchantMap[request.merchant_id]?.needs_review);
   };
 
-  const createMerchantGroups = (items: PurchaseRequest[]) => {
-    const grouped = items.reduce<Record<string, MerchantGroup>>(
+  const getRequestActivityGroupName = (request: PurchaseRequest) => {
+    if (
+      request.activity_group_id &&
+      activityGroupMap[request.activity_group_id]
+    ) {
+      return activityGroupMap[request.activity_group_id].name;
+    }
+
+    return request.activity_group_name || request.merchant || "Unknown activity";
+  };
+
+  const getRequestActivityNeedsReview = (request: PurchaseRequest) => {
+    if (!request.activity_group_id) {
+      return false;
+    }
+
+    return Boolean(activityGroupMap[request.activity_group_id]?.needs_review);
+  };
+
+  const getRequestGroupName = (request: PurchaseRequest) =>
+    isActivityRequest(request)
+      ? getRequestActivityGroupName(request)
+      : getRequestMerchantName(request);
+
+  const getRequestDisplayDate = (request: PurchaseRequest) =>
+    request.request_date || request.requested_at;
+
+  const createRequestGroups = (items: PurchaseRequest[]) => {
+    const grouped = items.reduce<Record<string, RequestGroup>>(
       (accumulator, request) => {
-        const merchantName = getRequestMerchantName(request);
-        const fallbackKey = normalizeMerchantName(merchantName) || "unknown";
-        const key = request.merchant_id
-          ? `merchant:${request.merchant_id}`
-          : `text:${fallbackKey}`;
+        const activity = isActivityRequest(request);
+        const groupName = getRequestGroupName(request);
+        const fallbackKey =
+          (activity
+            ? normalizeActivityGroupName(groupName)
+            : normalizeMerchantName(groupName)) || "unknown";
+        const activityType = request.activity_type || "other";
+        const key = activity
+          ? request.activity_group_id
+            ? `activity:${activityType}:${request.activity_group_id}`
+            : `activity:${activityType}:text:${fallbackKey}`
+          : request.merchant_id
+            ? `merchant:${request.merchant_id}`
+            : `merchant:text:${fallbackKey}`;
 
         accumulator[key] ??= {
           key,
-          merchantName,
-          needsReview: getRequestMerchantNeedsReview(request),
+          groupName,
+          groupType: activity ? "activities" : "materials",
+          activityType,
+          needsReview: activity
+            ? getRequestActivityNeedsReview(request)
+            : getRequestMerchantNeedsReview(request),
           requests: [],
         };
         accumulator[key].requests.push(request);
@@ -505,28 +934,98 @@ export function PurchaseRequestPanel() {
       {},
     );
 
-    return Object.values(grouped);
+    return Object.values(grouped).map((group) => ({
+      ...group,
+      requests: [...group.requests].sort((first, second) => {
+        const firstDate = getRequestDisplayDate(first) || first.created_at || "";
+        const secondDate = getRequestDisplayDate(second) || second.created_at || "";
+        return firstDate.localeCompare(secondDate);
+      }),
+    }));
   };
 
   const pendingGroups = useMemo(
     () =>
-      createMerchantGroups(
+      createRequestGroups(
         requests.filter((request) => request.status === "pending_payment"),
       ),
-    // createMerchantGroups intentionally depends on merchantMap through helpers.
+    // createRequestGroups intentionally depends on relation maps through helpers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [merchantMap, requests],
+    [activityGroupMap, merchantMap, requests],
+  );
+
+  const paidYears = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          requests
+            .filter((request) => request.status === "paid")
+            .map((request) => getRequestHistoryYear(request)),
+        ),
+      ).sort((first, second) => second.localeCompare(first)),
+    [requests],
   );
 
   const paidGroups = useMemo(
     () =>
-      createMerchantGroups(
-        requests.filter((request) => request.status === "paid"),
-      ),
-    // createMerchantGroups intentionally depends on merchantMap through helpers.
+      createRequestGroups(
+        requests.filter(
+          (request) =>
+            request.status === "paid" &&
+            (paidYearFilter === "all" ||
+              getRequestHistoryYear(request) === paidYearFilter),
+        ),
+      )
+        .map((group) => ({
+          ...group,
+          requests: [...group.requests].sort((first, second) => {
+            const firstDate =
+              first.paid_at || getRequestDisplayDate(first) || first.created_at || "";
+            const secondDate =
+              second.paid_at ||
+              getRequestDisplayDate(second) ||
+              second.created_at ||
+              "";
+            return secondDate.localeCompare(firstDate);
+          }),
+        }))
+        .sort((first, second) => {
+          const firstDate = getPaidGroupSummary(first).latestDate ?? "";
+          const secondDate = getPaidGroupSummary(second).latestDate ?? "";
+          return secondDate.localeCompare(firstDate);
+        }),
+    // createRequestGroups intentionally depends on relation maps through helpers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [merchantMap, requests],
+    [activityGroupMap, merchantMap, paidYearFilter, requests],
   );
+
+  const pendingMaterialsGroups = useMemo(
+    () => pendingGroups.filter((group) => group.groupType === "materials"),
+    [pendingGroups],
+  );
+
+  const pendingActivityGroups = useMemo(
+    () => pendingGroups.filter((group) => group.groupType === "activities"),
+    [pendingGroups],
+  );
+
+  const paidMaterialsGroups = useMemo(
+    () => paidGroups.filter((group) => group.groupType === "materials"),
+    [paidGroups],
+  );
+
+  const paidActivityGroups = useMemo(
+    () => paidGroups.filter((group) => group.groupType === "activities"),
+    [paidGroups],
+  );
+
+  const togglePaidGroup = (groupKey: string) => {
+    setExpandedPaidGroupKeys((current) =>
+      current.includes(groupKey)
+        ? current.filter((key) => key !== groupKey)
+        : [...current, groupKey],
+    );
+  };
 
   const handleCancelRequest = async (request: PurchaseRequest) => {
     setSubmitError("");
@@ -554,7 +1053,13 @@ export function PurchaseRequestPanel() {
       summary: `Deleted pending purchase request: ${request.item_name}.`,
       metadata: {
         item_name: request.item_name,
-        merchant: getRequestMerchantName(request),
+        group_name: getRequestGroupName(request),
+        merchant: isActivityRequest(request) ? null : getRequestMerchantName(request),
+        activity_group: isActivityRequest(request)
+          ? getRequestActivityGroupName(request)
+          : null,
+        activity_type: request.activity_type,
+        activity_detail: request.activity_detail,
         amount: request.estimated_cost,
         currency: request.currency,
         purpose: request.purpose,
@@ -589,29 +1094,63 @@ export function PurchaseRequestPanel() {
     const itemName = form.itemName.trim();
     const purpose = form.purpose.trim();
     const estimatedCost = Number(form.estimatedCost);
+    const isActivity = form.requestKind === "activities";
+    const requestDate = form.requestDate || todayInputValue();
 
-    if (!selectedMerchant) {
+    if (!isActivity && !selectedMerchant) {
       setSubmitError("Select or add a merchant before submitting.");
       return;
     }
 
-    const { data: currentMerchant, error: merchantError } = await supabase
-      .from("merchants")
-      .select(merchantSelect)
-      .eq("id", selectedMerchant.id)
-      .maybeSingle();
-
-    if (merchantError || !currentMerchant) {
-      setSubmitError("Please select the merchant again before submitting.");
+    if (isActivity && !selectedActivityGroup) {
+      setSubmitError("Select or add an activity group before submitting.");
       return;
     }
 
-    const submissionMerchant = currentMerchant as Merchant;
+    let submissionMerchant: Merchant | null = null;
+    let submissionActivityGroup: ActivityGroup | null = null;
 
-    if (submissionMerchant.is_active === false) {
-      setSelectedMerchant(null);
-      setSubmitError(inactiveMerchantMessage);
-      return;
+    if (!isActivity && selectedMerchant) {
+      const { data: currentMerchant, error: merchantError } = await supabase
+        .from("merchants")
+        .select(merchantSelect)
+        .eq("id", selectedMerchant.id)
+        .maybeSingle();
+
+      if (merchantError || !currentMerchant) {
+        setSubmitError("Please select the merchant again before submitting.");
+        return;
+      }
+
+      submissionMerchant = currentMerchant as Merchant;
+
+      if (submissionMerchant.is_active === false) {
+        setSelectedMerchant(null);
+        setSubmitError(inactiveMerchantMessage);
+        return;
+      }
+    }
+
+    if (isActivity && selectedActivityGroup) {
+      const { data: currentActivityGroup, error: activityGroupError } =
+        await supabase
+          .from("activity_groups")
+          .select(activityGroupSelect)
+          .eq("id", selectedActivityGroup.id)
+          .maybeSingle();
+
+      if (activityGroupError || !currentActivityGroup) {
+        setSubmitError("Please select the activity group again before submitting.");
+        return;
+      }
+
+      submissionActivityGroup = currentActivityGroup as ActivityGroup;
+
+      if (submissionActivityGroup.is_active === false) {
+        setSelectedActivityGroup(null);
+        setSubmitError(inactiveActivityGroupMessage);
+        return;
+      }
     }
 
     if (!itemName || !purpose || !form.estimatedCost.trim()) {
@@ -639,10 +1178,18 @@ export function PurchaseRequestPanel() {
 
     const { error } = await supabase.from("purchase_requests").insert({
       requester_id: user.id,
-      merchant_id: submissionMerchant.id,
-      merchant: submissionMerchant.name,
+      request_kind: form.requestKind,
+      request_date: requestDate,
+      merchant_id: submissionMerchant?.id ?? null,
+      merchant: submissionMerchant?.name ?? null,
+      activity_group_id: submissionActivityGroup?.id ?? null,
+      activity_group_name: submissionActivityGroup?.name ?? null,
+      activity_type: isActivity
+        ? submissionActivityGroup?.activity_type ?? form.activityType
+        : null,
+      activity_detail: isActivity ? form.activityDetail.trim() || null : null,
       item_name: itemName,
-      cost_category: form.costCategory,
+      cost_category: form.requestKind,
       estimated_cost: estimatedCost,
       currency: form.currency.trim() || "KRW",
       purpose,
@@ -658,13 +1205,58 @@ export function PurchaseRequestPanel() {
       return;
     }
 
-    setForm(initialForm);
+    setForm(getInitialForm());
     setMerchantSearch("");
     setSelectedMerchant(null);
+    setActivityGroupSearch("");
+    setSelectedActivityGroup(null);
     setSuccessMessage("Purchase request created as a Pending Payment item.");
     setSubmitting(false);
     await loadRequests();
   };
+
+  const renderGroupHeader = (group: RequestGroup) => (
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
+      <span
+        className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+          group.groupType === "materials"
+            ? "border-brand/20 bg-brand-soft text-brand"
+            : "border-cyan-200 bg-cyan-50 text-cyan-700"
+        }`}
+      >
+        {group.groupType === "materials" ? "Materials" : "Activities"}
+      </span>
+      {group.groupType === "activities" ? (
+        <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.72rem] font-semibold text-muted">
+          {formatActivityType(group.activityType)}
+        </span>
+      ) : null}
+      <span className="min-w-0 truncate text-lg font-semibold text-foreground">
+        {getGroupLabel(group)}
+      </span>
+    </span>
+  );
+
+  const renderYearTabs = () => (
+    <div className="mt-4 overflow-x-auto">
+      <div className="flex min-w-max gap-2">
+        {["all", ...paidYears].map((year) => (
+          <button
+            key={year}
+            type="button"
+            onClick={() => setPaidYearFilter(year)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              paidYearFilter === year
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-white text-muted hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+            }`}
+          >
+            {year === "all" ? "All" : year}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -675,8 +1267,9 @@ export function PurchaseRequestPanel() {
         Submit a Pending Payment request
       </h2>
       <p className="mt-3 max-w-3xl break-words text-sm leading-7 text-muted">
-        Search for an existing merchant first. If it is not listed, add a new
-        merchant record so future payment tracking stays consistent.
+        Materials use Merchant records. Activities use Activity Groups such as
+        a conference, analysis facility, or lab event so payments can be grouped
+        cleanly later.
       </p>
 
       <form
@@ -684,6 +1277,36 @@ export function PurchaseRequestPanel() {
         className="portal-card mt-6 rounded-lg border border-line p-4 shadow-panel sm:mt-8 sm:p-6"
       >
         <div className="grid gap-5 md:grid-cols-2">
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            {(["materials", "activities"] as RequestKind[]).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => switchRequestKind(kind)}
+                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                  form.requestKind === kind
+                    ? "border-brand bg-brand text-white"
+                    : "border-line bg-white text-muted hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+                }`}
+              >
+                {kind === "materials" ? "Materials Request" : "Activity Request"}
+              </button>
+            ))}
+          </div>
+
+          <label className="grid gap-2">
+            <FieldLabel>Request date</FieldLabel>
+            <input
+              type="date"
+              value={form.requestDate}
+              onChange={(event) =>
+                updateForm("requestDate", event.target.value)
+              }
+              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
+            />
+          </label>
+
+          {form.requestKind === "materials" ? (
           <div className="grid gap-2 md:col-span-2">
             <FieldLabel required>Merchant</FieldLabel>
             <div className="relative">
@@ -788,6 +1411,147 @@ export function PurchaseRequestPanel() {
               </p>
             ) : null}
           </div>
+          ) : (
+          <div className="grid gap-2 md:col-span-2">
+            <FieldLabel required>Activity group</FieldLabel>
+            <div className="grid gap-3 md:grid-cols-[0.35fr_1fr]">
+              <label className="grid gap-1">
+                <span className="text-xs font-semibold text-muted">
+                  Activity type
+                </span>
+                <select
+                  value={form.activityType}
+                  onChange={(event) => {
+                    updateForm("activityType", event.target.value as ActivityType);
+                    setSelectedActivityGroup(null);
+                    setActivityGroupSearch("");
+                  }}
+                  className="rounded-md border border-line bg-white px-3 py-2.5 text-sm capitalize outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
+                >
+                  {activityTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {formatActivityType(type)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="relative">
+                <input
+                  required
+                  value={activityGroupSearch}
+                  onFocus={() => setActivityGroupDropdownOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(
+                      () => setActivityGroupDropdownOpen(false),
+                      120,
+                    );
+                  }}
+                  onChange={(event) =>
+                    handleActivityGroupSearchChange(event.target.value)
+                  }
+                  className="w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
+                  placeholder="Search existing activity groups"
+                />
+
+                {activityGroupDropdownOpen ? (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-md border border-line bg-white p-2 shadow-panel">
+                    {activityGroupsLoading ? (
+                      <p className="px-3 py-2 text-sm text-muted">
+                        Loading activity groups...
+                      </p>
+                    ) : null}
+
+                    {!activityGroupsLoading &&
+                    filteredActivityGroups.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted">
+                        No matching activity groups found.
+                      </p>
+                    ) : null}
+
+                    {!activityGroupsLoading &&
+                    filteredActivityGroups.length > 0 ? (
+                      <div className="grid gap-1">
+                        {filteredActivityGroups.map((group) => (
+                          <button
+                            key={group.id}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectActivityGroup(group)}
+                            className={`rounded-md px-3 py-2 text-left text-sm font-semibold transition ${
+                              selectedActivityGroup?.id === group.id
+                                ? "bg-brand-soft text-brand"
+                                : "text-muted hover:bg-brand-soft hover:text-foreground"
+                            }`}
+                          >
+                            <span>{group.name}</span>
+                            <span className="ml-2 text-xs font-medium text-muted">
+                              {formatActivityType(group.activity_type)}
+                            </span>
+                            {group.needs_review ? (
+                              <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">
+                                Needs review
+                              </span>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {canAddActivityGroup ? (
+                      <button
+                        type="button"
+                        disabled={addingActivityGroup}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => void handleAddActivityGroup()}
+                        className="mt-2 w-full rounded-md border border-brand/30 bg-brand-soft px-3 py-2 text-left text-sm font-semibold text-brand transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {addingActivityGroup
+                          ? "Adding activity group..."
+                          : `Add new activity group: ${activityGroupSearch.trim()}`}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {selectedActivityGroup ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand-soft px-3 py-1.5 text-sm font-semibold text-brand">
+                  {selectedActivityGroup.name}
+                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs text-muted">
+                    {formatActivityType(selectedActivityGroup.activity_type)}
+                  </span>
+                  {selectedActivityGroup.needs_review ? (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">
+                      Needs review
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={clearSelectedActivityGroup}
+                    className="ml-1 rounded-full px-1 text-brand transition hover:bg-white"
+                    aria-label="Clear selected activity group"
+                  >
+                    x
+                  </button>
+                </span>
+              </div>
+            ) : null}
+
+            <p className="text-xs leading-6 text-muted">
+              New activity groups are marked as Needs review until a
+              professor/admin confirms the group name.
+            </p>
+            {!selectedActivityGroup ? (
+              <p className="text-xs font-medium text-accent">
+                Select an existing activity group or add a new one before
+                submitting.
+              </p>
+            ) : null}
+          </div>
+          )}
 
           <label className="grid gap-2">
             <FieldLabel required>Item name</FieldLabel>
@@ -796,24 +1560,27 @@ export function PurchaseRequestPanel() {
               value={form.itemName}
               onChange={(event) => updateForm("itemName", event.target.value)}
               className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
-              placeholder="e.g., Gas sensor substrate"
+              placeholder={
+                form.requestKind === "activities"
+                  ? activityItemExamples
+                  : "e.g., Gas sensor substrate"
+              }
             />
           </label>
 
-          <label className="grid gap-2">
-            <FieldLabel required>Cost category</FieldLabel>
-            <select
-              required
-              value={form.costCategory}
-              onChange={(event) =>
-                updateForm("costCategory", event.target.value as CostCategory)
-              }
-              className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
-            >
-              <option value="materials">Materials</option>
-              <option value="activities">Activities</option>
-            </select>
-          </label>
+          {form.requestKind === "activities" ? (
+            <label className="grid gap-2">
+              <FieldLabel>Activity detail</FieldLabel>
+              <input
+                value={form.activityDetail}
+                onChange={(event) =>
+                  updateForm("activityDetail", event.target.value)
+                }
+                className="rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
+                placeholder="e.g., Daegu->Jeju (LSY)"
+              />
+            </label>
+          ) : null}
 
           <label className="grid gap-2">
             <FieldLabel required>Estimated cost</FieldLabel>
@@ -938,8 +1705,30 @@ export function PurchaseRequestPanel() {
         ) : null}
 
         {!requestsLoading && !requestsError && pendingGroups.length > 0 ? (
-          <div className="mt-6 grid gap-4">
-            {pendingGroups.map((group) => (
+          <div className="mt-6 grid gap-5">
+            {[
+              {
+                title: "Pending Materials",
+                groups: pendingMaterialsGroups,
+                empty: "No pending materials.",
+              },
+              {
+                title: "Pending Activities",
+                groups: pendingActivityGroups,
+                empty: "No pending activities.",
+              },
+            ].map((section) => (
+              <section key={section.title}>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                  {section.title}
+                </p>
+                {section.groups.length === 0 ? (
+                  <div className="mt-3 rounded-md border border-dashed border-line p-4 text-sm text-muted">
+                    {section.empty}
+                  </div>
+                ) : null}
+                <div className="mt-3 grid gap-4">
+            {section.groups.map((group) => (
               <article
                 key={group.key}
                 className="elevated-card portal-card border border-line p-4"
@@ -956,9 +1745,7 @@ export function PurchaseRequestPanel() {
                         </span>
                       ) : null}
                     </div>
-                    <h4 className="mt-1 text-xl font-semibold">
-                      {group.merchantName}
-                    </h4>
+                    <div className="mt-1">{renderGroupHeader(group)}</div>
                   </div>
                   <p className="rounded-md bg-brand-soft px-3 py-2 text-sm font-semibold text-brand">
                     {formatGroupTotal(group.requests)}
@@ -977,13 +1764,20 @@ export function PurchaseRequestPanel() {
                             {request.item_name}
                           </p>
                           <p className="mt-0.5 text-xs text-muted">
-                            {formatDate(request.requested_at)} -{" "}
+                            {formatDate(getRequestDisplayDate(request))} -{" "}
                             {formatStatus(request.status)}
                           </p>
+                          {isActivityRequest(request) && request.activity_detail ? (
+                            <p className="mt-0.5 break-words text-xs text-muted">
+                              {request.activity_detail}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs">
                           <span className="rounded-md bg-brand-soft px-2 py-1 font-semibold capitalize text-brand">
-                            {request.cost_category || "uncategorized"}
+                            {isActivityRequest(request)
+                              ? formatActivityType(request.activity_type)
+                              : request.cost_category || "uncategorized"}
                           </span>
                           <span className="rounded-md bg-white px-2 py-1 font-semibold text-muted">
                             {formatCost(
@@ -1039,6 +1833,9 @@ export function PurchaseRequestPanel() {
                 </div>
               </article>
             ))}
+                </div>
+              </section>
+            ))}
           </div>
         ) : null}
 
@@ -1047,35 +1844,95 @@ export function PurchaseRequestPanel() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
               Paid Requests
             </p>
-            <div className="mt-4 grid gap-3">
-              {paidGroups.map((group) => (
+            {renderYearTabs()}
+            <div className="mt-4 grid gap-5">
+              {[
+                {
+                  title: "Paid Materials",
+                  groups: paidMaterialsGroups,
+                  empty: "No paid materials yet.",
+                },
+                {
+                  title: "Paid Activities",
+                  groups: paidActivityGroups,
+                  empty: "No paid activities yet.",
+                },
+              ].map((section) => (
+                <section key={section.title}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    {section.title}
+                  </p>
+                  {section.groups.length === 0 ? (
+                    <div className="mt-3 rounded-md border border-dashed border-line p-4 text-sm text-muted">
+                      {section.empty}
+                    </div>
+                  ) : null}
+                  <div className="mt-3 grid gap-3">
+              {section.groups.map((group) => {
+                const expanded = expandedPaidGroupKeys.includes(group.key);
+                const summary = getPaidGroupSummary(group);
+
+                return (
                 <article
                   key={group.key}
-                  className="rounded-md border border-line bg-white/65 p-3"
+                  className="rounded-md border border-line bg-white/65"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => togglePaidGroup(group.key)}
+                    className="flex w-full flex-wrap items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-brand-soft/50"
+                    aria-expanded={expanded}
+                  >
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-semibold">{group.merchantName}</h4>
+                      <span className="text-xs font-semibold text-brand">
+                        {expanded ? "v" : ">"}
+                      </span>
+                      <div className="min-w-0">{renderGroupHeader(group)}</div>
+                      <h4 className="hidden">
+                        {group.groupType === "activities"
+                          ? `${formatActivityType(group.activityType)} · ${group.groupName}`
+                          : group.groupName}
+                      </h4>
                       {group.needsReview ? (
                         <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
                           Needs review
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm font-semibold text-muted">
-                      {formatGroupTotal(group.requests)}
+                    <p className="text-sm font-semibold text-brand">
+                      {group.requests.length} paid request
+                      {group.requests.length === 1 ? "" : "s"} - {summary.total}
+                      {summary.latestDate
+                        ? ` - latest ${formatDate(summary.latestDate)}`
+                        : ""}
                     </p>
-                  </div>
+                  </button>
 
-                  <div className="mt-2 grid gap-2">
+                  {expanded ? (
+                  <div className="grid gap-1.5 border-t border-line px-2.5 py-2">
                     {group.requests.map((request) => (
                       <div
                         key={request.id}
-                        className="grid gap-2 rounded-md bg-[#f7f9fb] px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
+                        className="grid gap-2 rounded-md bg-[#f7f9fb] px-2.5 py-1.5 text-xs text-muted lg:grid-cols-[0.7fr_minmax(0,1.5fr)_auto_auto_auto] lg:items-center"
                       >
-                        <p className="break-words font-semibold text-foreground lg:truncate">
-                          {request.item_name}
+                        <p className="font-medium">
+                          {formatDate(getRequestDisplayDate(request))}
                         </p>
+                        <div className="min-w-0">
+                          <p className="break-words font-semibold text-foreground lg:truncate">
+                            {request.item_name}
+                          </p>
+                          {isActivityRequest(request) && request.activity_detail ? (
+                            <p className="mt-0.5 truncate text-muted">
+                              Detail: {request.activity_detail}
+                            </p>
+                          ) : null}
+                          {request.payment_note ? (
+                            <p className="mt-0.5 truncate text-muted">
+                              Note: {request.payment_note}
+                            </p>
+                          ) : null}
+                        </div>
                         <p className="font-semibold">
                           {formatCost(request.estimated_cost, request.currency)}
                         </p>
@@ -1089,7 +1946,12 @@ export function PurchaseRequestPanel() {
                       </div>
                     ))}
                   </div>
+                  ) : null}
                 </article>
+                );
+              })}
+                  </div>
+                </section>
               ))}
             </div>
           </section>

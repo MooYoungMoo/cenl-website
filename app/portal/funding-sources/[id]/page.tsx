@@ -27,6 +27,10 @@ type PurchaseRequest = {
   requester_id: string;
   merchant_id: string | null;
   merchant: string | null;
+  activity_group_id: string | null;
+  activity_group_name: string | null;
+  activity_type: string | null;
+  activity_detail: string | null;
   item_name: string;
   cost_category: CostCategory | null;
   estimated_cost: number | null;
@@ -51,13 +55,21 @@ type Merchant = {
   name: string;
 };
 
+type ActivityGroup = {
+  id: string;
+  name: string;
+  activity_type: string | null;
+};
+
 type FundingSourceManager = {
   funding_source_id: string;
   user_id: string;
 };
 
 const requestSelect =
-  "id, requester_id, merchant_id, merchant, item_name, cost_category, estimated_cost, currency, purpose, payment_note, status, funding_source_id, paid_at";
+  "id, requester_id, merchant_id, merchant, activity_group_id, activity_group_name, activity_type, activity_detail, item_name, cost_category, estimated_cost, currency, purpose, payment_note, status, funding_source_id, paid_at";
+
+const activityGroupSelect = "id, name, activity_type";
 
 function canViewAll(role: string | null) {
   return role === "professor" || role === "admin";
@@ -97,6 +109,38 @@ function getMerchantName(
   return request.merchant || "Unknown merchant";
 }
 
+function formatActivityType(value: string | null | undefined) {
+  if (!value) {
+    return "Activity";
+  }
+
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) =>
+    letter.toUpperCase(),
+  );
+}
+
+function getRequestEntityName(
+  request: PurchaseRequest,
+  merchantMap: Record<string, Merchant>,
+  activityGroupMap: Record<string, ActivityGroup>,
+) {
+  const isActivity =
+    request.cost_category === "activities" ||
+    Boolean(request.activity_group_id || request.activity_group_name);
+
+  if (!isActivity) {
+    return getMerchantName(request, merchantMap);
+  }
+
+  const group = request.activity_group_id
+    ? activityGroupMap[request.activity_group_id]
+    : undefined;
+
+  return `${formatActivityType(request.activity_type || group?.activity_type)} · ${
+    group?.name || request.activity_group_name || request.merchant || "Unknown activity"
+  }`;
+}
+
 function getPaidAmount(requests: PurchaseRequest[], category: CostCategory) {
   return requests
     .filter((request) => request.cost_category === category)
@@ -109,6 +153,9 @@ export default function FundingSourceDetailPage() {
   const [source, setSource] = useState<FundingSource | null>(null);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
+  const [activityGroupMap, setActivityGroupMap] = useState<
+    Record<string, ActivityGroup>
+  >({});
   const [profileMap, setProfileMap] = useState<Record<string, Profile>>({});
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -183,13 +230,27 @@ export default function FundingSourceDetailPage() {
     const requesterIds = Array.from(
       new Set(nextRequests.map((request) => request.requester_id)),
     );
+    const activityGroupIds = Array.from(
+      new Set(
+        nextRequests
+          .map((request) => request.activity_group_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
 
-    const [merchantsResult, profilesResult] = await Promise.all([
+    const [merchantsResult, profilesResult, activityGroupsResult] =
+      await Promise.all([
       merchantIds.length > 0
         ? supabase.from("merchants").select("id, name").in("id", merchantIds)
         : Promise.resolve({ data: [], error: null }),
       requesterIds.length > 0
         ? supabase.from("profiles").select("*").in("id", requesterIds)
+        : Promise.resolve({ data: [], error: null }),
+      activityGroupIds.length > 0
+        ? supabase
+            .from("activity_groups")
+            .select(activityGroupSelect)
+            .in("id", activityGroupIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -206,6 +267,14 @@ export default function FundingSourceDetailPage() {
         Record<string, Profile>
       >((accumulator, profile) => {
         accumulator[profile.id] = profile;
+        return accumulator;
+      }, {}),
+    );
+    setActivityGroupMap(
+      ((activityGroupsResult.data ?? []) as ActivityGroup[]).reduce<
+        Record<string, ActivityGroup>
+      >((accumulator, group) => {
+        accumulator[group.id] = group;
         return accumulator;
       }, {}),
     );
@@ -247,7 +316,11 @@ export default function FundingSourceDetailPage() {
     const totals = requests.reduce<
       Record<string, { merchantName: string; total: number; count: number }>
     >((accumulator, request) => {
-      const merchantName = getMerchantName(request, merchantMap);
+      const merchantName = getRequestEntityName(
+        request,
+        merchantMap,
+        activityGroupMap,
+      );
       accumulator[merchantName] ??= { merchantName, total: 0, count: 0 };
       accumulator[merchantName].total += request.estimated_cost ?? 0;
       accumulator[merchantName].count += 1;
@@ -255,7 +328,7 @@ export default function FundingSourceDetailPage() {
     }, {});
 
     return Object.values(totals).sort((first, second) => second.total - first.total);
-  }, [merchantMap, requests]);
+  }, [activityGroupMap, merchantMap, requests]);
 
   const requestsByCategory = useMemo(
     () => ({
@@ -404,7 +477,11 @@ export default function FundingSourceDetailPage() {
                       <div className="grid gap-2 md:grid-cols-[0.8fr_1fr_1.3fr_auto] md:items-center">
                         <p>{formatDate(request.paid_at)}</p>
                         <p className="font-semibold text-foreground">
-                          {getMerchantName(request, merchantMap)}
+                          {getRequestEntityName(
+                            request,
+                            merchantMap,
+                            activityGroupMap,
+                          )}
                         </p>
                         <p className="font-semibold text-foreground">
                           {request.item_name}
@@ -425,6 +502,11 @@ export default function FundingSourceDetailPage() {
                         {request.payment_note ? (
                           <p className="md:col-span-2">
                             Payment note: {request.payment_note}
+                          </p>
+                        ) : null}
+                        {request.activity_detail ? (
+                          <p className="md:col-span-2">
+                            Activity detail: {request.activity_detail}
                           </p>
                         ) : null}
                       </div>

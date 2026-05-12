@@ -48,12 +48,32 @@ type MerchantReview = {
   is_active: boolean | null;
 };
 
+type ActivityGroupReview = {
+  id: string;
+  name: string;
+  normalized_name: string;
+  activity_type: string | null;
+  note: string | null;
+  needs_review: boolean | null;
+  is_active: boolean | null;
+};
+
 type FundingUsage = {
   funding_source_id: string | null;
 };
 
 type MerchantUsage = {
   merchant_id: string | null;
+};
+
+type ActivityGroupUsage = {
+  activity_group_id: string | null;
+};
+
+type ActivityGroupDraft = {
+  name: string;
+  activityType: string;
+  note: string;
 };
 
 type FundingSourceManager = {
@@ -110,6 +130,20 @@ function normalizeMerchantName(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeActivityGroupName(value: string) {
+  return normalizeMerchantName(value);
+}
+
+function formatActivityType(value: string | null | undefined) {
+  if (!value) {
+    return "Other";
+  }
+
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) =>
+    letter.toUpperCase(),
+  );
 }
 
 function formatDate(value: string | null) {
@@ -185,6 +219,12 @@ export default function AdminPage() {
   >({});
   const [usedMerchantIds, setUsedMerchantIds] = useState<string[]>([]);
   const [merchantReviews, setMerchantReviews] = useState<MerchantReview[]>([]);
+  const [usedActivityGroupIds, setUsedActivityGroupIds] = useState<string[]>(
+    [],
+  );
+  const [activityGroupReviews, setActivityGroupReviews] = useState<
+    ActivityGroupReview[]
+  >([]);
   const [profiles, setProfiles] = useState<ManagedProfile[]>([]);
   const [profileDrafts, setProfileDrafts] = useState<
     Record<string, ManagedProfileForm>
@@ -198,10 +238,19 @@ export default function AdminPage() {
   const [merchantDrafts, setMerchantDrafts] = useState<Record<string, string>>(
     {},
   );
+  const [activityGroupDrafts, setActivityGroupDrafts] = useState<
+    Record<string, ActivityGroupDraft>
+  >({});
   const [mergeSourceSearch, setMergeSourceSearch] = useState("");
   const [mergeTargetSearch, setMergeTargetSearch] = useState("");
   const [mergeSourceMerchantId, setMergeSourceMerchantId] = useState("");
   const [mergeTargetMerchantId, setMergeTargetMerchantId] = useState("");
+  const [activityMergeSourceSearch, setActivityMergeSourceSearch] =
+    useState("");
+  const [activityMergeTargetSearch, setActivityMergeTargetSearch] =
+    useState("");
+  const [activityMergeSourceId, setActivityMergeSourceId] = useState("");
+  const [activityMergeTargetId, setActivityMergeTargetId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -251,6 +300,27 @@ export default function AdminPage() {
     [merchantReviews],
   );
 
+  const needsReviewActivityGroups = useMemo(
+    () =>
+      activityGroupReviews.filter(
+        (group) => group.is_active !== false && group.needs_review,
+      ),
+    [activityGroupReviews],
+  );
+
+  const activeActivityGroups = useMemo(
+    () =>
+      activityGroupReviews.filter(
+        (group) => group.is_active !== false && !group.needs_review,
+      ),
+    [activityGroupReviews],
+  );
+
+  const inactiveActivityGroups = useMemo(
+    () => activityGroupReviews.filter((group) => group.is_active === false),
+    [activityGroupReviews],
+  );
+
   const sortedProfiles = useMemo(
     () =>
       [...profiles].sort((first, second) =>
@@ -294,6 +364,20 @@ export default function AdminPage() {
     [mergeTargetMerchantId, merchantReviews],
   );
 
+  const activityMergeSourceGroup = useMemo(
+    () =>
+      activityGroupReviews.find((group) => group.id === activityMergeSourceId) ??
+      null,
+    [activityGroupReviews, activityMergeSourceId],
+  );
+
+  const activityMergeTargetGroup = useMemo(
+    () =>
+      activityGroupReviews.find((group) => group.id === activityMergeTargetId) ??
+      null,
+    [activityGroupReviews, activityMergeTargetId],
+  );
+
   const sourceMerchantOptions = useMemo(() => {
     const search = mergeSourceSearch.trim().toLowerCase();
 
@@ -321,6 +405,33 @@ export default function AdminPage() {
       .slice(0, 12);
   }, [mergeTargetSearch, merchantReviews]);
 
+  const activitySourceOptions = useMemo(() => {
+    const search = activityMergeSourceSearch.trim().toLowerCase();
+
+    return activityGroupReviews
+      .filter((group) =>
+        search
+          ? group.name.toLowerCase().includes(search) ||
+            group.normalized_name.includes(normalizeActivityGroupName(search))
+          : true,
+      )
+      .slice(0, 12);
+  }, [activityGroupReviews, activityMergeSourceSearch]);
+
+  const activityTargetOptions = useMemo(() => {
+    const search = activityMergeTargetSearch.trim().toLowerCase();
+
+    return activityGroupReviews
+      .filter((group) => group.is_active !== false)
+      .filter((group) =>
+        search
+          ? group.name.toLowerCase().includes(search) ||
+            group.normalized_name.includes(normalizeActivityGroupName(search))
+          : true,
+      )
+      .slice(0, 12);
+  }, [activityGroupReviews, activityMergeTargetSearch]);
+
   const getFundingSourceLabel = (sourceId: string) =>
     fundingSources.find((source) => source.id === sourceId)?.name ??
     "Funding Source";
@@ -328,6 +439,10 @@ export default function AdminPage() {
   const getMerchantLabel = (merchantId: string) =>
     merchantReviews.find((merchant) => merchant.id === merchantId)?.name ??
     "Merchant";
+
+  const getActivityGroupLabel = (groupId: string) =>
+    activityGroupReviews.find((group) => group.id === groupId)?.name ??
+    "Activity Group";
 
   const getProfileLabel = (profileId: string) => {
     const profile = profileMap[profileId];
@@ -432,6 +547,52 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadActivityGroupReviews = useCallback(async () => {
+    const [groupsResult, usageResult] = await Promise.all([
+      supabase
+        .from("activity_groups")
+        .select(
+          "id, name, normalized_name, activity_type, note, needs_review, is_active",
+        )
+        .order("is_active", { ascending: false })
+        .order("activity_type", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("purchase_requests")
+        .select("activity_group_id")
+        .not("activity_group_id", "is", null),
+    ]);
+
+    if (groupsResult.error) {
+      setActivityGroupReviews([]);
+      setErrorMessage(groupsResult.error.message);
+      return;
+    }
+
+    const nextGroups = (groupsResult.data ?? []) as ActivityGroupReview[];
+    setActivityGroupReviews(nextGroups);
+    setActivityGroupDrafts(
+      nextGroups.reduce<Record<string, ActivityGroupDraft>>(
+        (accumulator, group) => {
+          accumulator[group.id] = {
+            name: group.name,
+            activityType: group.activity_type ?? "other",
+            note: group.note ?? "",
+          };
+          return accumulator;
+        },
+        {},
+      ),
+    );
+
+    if (!usageResult.error) {
+      const usedIds = ((usageResult.data ?? []) as ActivityGroupUsage[])
+        .map((row) => row.activity_group_id)
+        .filter((id): id is string => Boolean(id));
+      setUsedActivityGroupIds(Array.from(new Set(usedIds)));
+    }
+  }, []);
+
   const loadProfiles = useCallback(async () => {
     const { data, error } = await supabase
       .from("profiles")
@@ -504,17 +665,19 @@ export default function AdminPage() {
     if (canManage(nextRole)) {
       await Promise.all([
         loadFundingSources(),
+        loadActivityGroupReviews(),
         loadMerchantReviews(),
         loadProfiles(),
       ]);
     } else if (hasProjectAdminAccess) {
-      await loadMerchantReviews();
+      await Promise.all([loadActivityGroupReviews(), loadMerchantReviews()]);
     }
 
     setLoading(false);
   }, [
     loadFundingSourceManagers,
     loadFundingSources,
+    loadActivityGroupReviews,
     loadMerchantReviews,
     loadProfiles,
   ]);
@@ -1367,8 +1530,349 @@ export default function AdminPage() {
     await loadMerchantReviews();
   };
 
+  const handleSaveActivityGroup = async (groupId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const draft = activityGroupDrafts[groupId];
+
+    if (!draft) {
+      return;
+    }
+
+    const name = draft.name.trim();
+    const activityType = draft.activityType.trim().toLowerCase() || "other";
+    const normalizedName = normalizeActivityGroupName(name);
+    const currentGroup = activityGroupReviews.find((group) => group.id === groupId);
+
+    if (!name) {
+      setErrorMessage("Activity group name is required.");
+      return;
+    }
+
+    if (!normalizedName) {
+      setErrorMessage(
+        "Activity group name must include at least one letter or number.",
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    const { data: existingGroup, error: lookupError } = await supabase
+      .from("activity_groups")
+      .select("id")
+      .eq("activity_type", activityType)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+
+    if (lookupError) {
+      setErrorMessage(lookupError.message);
+      setSaving(false);
+      return;
+    }
+
+    if (existingGroup && (existingGroup as { id: string }).id !== groupId) {
+      setErrorMessage(
+        "An activity group with this normalized name and activity type already exists.",
+      );
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("activity_groups")
+      .update({
+        name,
+        normalized_name: normalizedName,
+        activity_type: activityType,
+        note: draft.note.trim() || null,
+      })
+      .eq("id", groupId);
+
+    if (error) {
+      if (error.message.toLowerCase().includes("duplicate")) {
+        setErrorMessage(
+          "An activity group with this normalized name and activity type already exists.",
+        );
+      } else {
+        setErrorMessage(error.message);
+      }
+      setSaving(false);
+      return;
+    }
+
+    await supabase
+      .from("purchase_requests")
+      .update({
+        activity_group_name: name,
+        activity_type: activityType,
+      })
+      .eq("activity_group_id", groupId);
+
+    await logPortalActivity({
+      action: "edit_activity_group",
+      entityType: "activity_group",
+      entityId: groupId,
+      summary: `Edited Activity Group from ${
+        currentGroup?.name ?? "Activity Group"
+      } to ${name}.`,
+      metadata: {
+        activity_group_id: groupId,
+        previous_name: currentGroup?.name ?? null,
+        previous_activity_type: currentGroup?.activity_type ?? null,
+        previous_normalized_name: currentGroup?.normalized_name ?? null,
+        new_name: name,
+        new_activity_type: activityType,
+        new_normalized_name: normalizedName,
+      },
+    });
+
+    setSuccessMessage("Activity group updated.");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
+  const handleMarkActivityGroupReviewed = async (groupId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("activity_groups")
+      .update({ needs_review: false })
+      .eq("id", groupId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Activity group marked as reviewed.");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
+  const handleDeactivateActivityGroup = async (groupId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to deactivate this activity group? It will no longer appear in Activity Request selection, but linked purchase requests will remain.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setErrorMessage("");
+    setSuccessMessage("");
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("activity_groups")
+      .update({ is_active: false })
+      .eq("id", groupId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    await logPortalActivity({
+      action: "deactivate_activity_group",
+      entityType: "activity_group",
+      entityId: groupId,
+      summary: `Deactivated Activity Group: ${getActivityGroupLabel(groupId)}.`,
+      metadata: {
+        activity_group_id: groupId,
+        activity_group_name: getActivityGroupLabel(groupId),
+      },
+    });
+
+    setSuccessMessage("Activity group deactivated.");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
+  const handleReactivateActivityGroup = async (groupId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("activity_groups")
+      .update({ is_active: true })
+      .eq("id", groupId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    await logPortalActivity({
+      action: "reactivate_activity_group",
+      entityType: "activity_group",
+      entityId: groupId,
+      summary: `Reactivated Activity Group: ${getActivityGroupLabel(groupId)}.`,
+      metadata: {
+        activity_group_id: groupId,
+        activity_group_name: getActivityGroupLabel(groupId),
+      },
+    });
+
+    setSuccessMessage("Activity group reactivated.");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
+  const handleDeleteActivityGroup = async (groupId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (usedActivityGroupIds.includes(groupId)) {
+      setErrorMessage(
+        "This activity group is linked to purchase records and should remain deactivated instead of deleted.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this inactive unused activity group? This cannot be undone.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("activity_groups")
+      .delete()
+      .eq("id", groupId);
+
+    if (error) {
+      setErrorMessage(
+        "This activity group is linked to purchase records and should remain deactivated instead of deleted.",
+      );
+      setSaving(false);
+      return;
+    }
+
+    await logPortalActivity({
+      action: "delete_activity_group",
+      entityType: "activity_group",
+      entityId: groupId,
+      summary: `Deleted inactive unused Activity Group: ${getActivityGroupLabel(
+        groupId,
+      )}.`,
+      metadata: {
+        activity_group_id: groupId,
+        activity_group_name: getActivityGroupLabel(groupId),
+      },
+    });
+
+    setSuccessMessage("Inactive unused activity group deleted.");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
+  const handleMergeActivityGroups = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!activityMergeSourceGroup || !activityMergeTargetGroup) {
+      setErrorMessage("Select both a source and target activity group.");
+      return;
+    }
+
+    if (activityMergeSourceGroup.id === activityMergeTargetGroup.id) {
+      setErrorMessage("Source and target activity groups cannot be the same.");
+      return;
+    }
+
+    if (activityMergeTargetGroup.is_active === false) {
+      setErrorMessage("Target activity group must be active before merging.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to merge this activity group? Linked purchase requests will move from ${activityMergeSourceGroup.name} to ${activityMergeTargetGroup.name}. This cannot be automatically undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+
+    const { error: requestError } = await supabase
+      .from("purchase_requests")
+      .update({
+        activity_group_id: activityMergeTargetGroup.id,
+        activity_group_name: activityMergeTargetGroup.name,
+        activity_type: activityMergeTargetGroup.activity_type ?? "other",
+      })
+      .eq("activity_group_id", activityMergeSourceGroup.id);
+
+    if (requestError) {
+      setErrorMessage(requestError.message);
+      setSaving(false);
+      return;
+    }
+
+    const mergeMessage = `Merged into ${activityMergeTargetGroup.name}`;
+    const nextNote = activityMergeSourceGroup.note
+      ? `${activityMergeSourceGroup.note}\n${mergeMessage}`
+      : mergeMessage;
+
+    const { error: sourceError } = await supabase
+      .from("activity_groups")
+      .update({
+        is_active: false,
+        needs_review: false,
+        note: nextNote,
+      })
+      .eq("id", activityMergeSourceGroup.id);
+
+    if (sourceError) {
+      setErrorMessage(sourceError.message);
+      setSaving(false);
+      return;
+    }
+
+    await logPortalActivity({
+      action: "merge_activity_group",
+      entityType: "activity_group",
+      entityId: activityMergeSourceGroup.id,
+      summary: `Merged ${activityMergeSourceGroup.name} into ${activityMergeTargetGroup.name}.`,
+      metadata: {
+        source_activity_group_id: activityMergeSourceGroup.id,
+        source_activity_group_name: activityMergeSourceGroup.name,
+        target_activity_group_id: activityMergeTargetGroup.id,
+        target_activity_group_name: activityMergeTargetGroup.name,
+        target_activity_type: activityMergeTargetGroup.activity_type,
+        source_note: nextNote,
+      },
+    });
+
+    setSuccessMessage(
+      `${activityMergeSourceGroup.name} was merged into ${activityMergeTargetGroup.name}.`,
+    );
+    setActivityMergeSourceId("");
+    setActivityMergeTargetId("");
+    setActivityMergeSourceSearch("");
+    setActivityMergeTargetSearch("");
+    setSaving(false);
+    await loadActivityGroupReviews();
+  };
+
   const renderUserManagement = () => (
-    <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+    <section
+      id="user-management"
+      className="order-1 scroll-mt-28 portal-card rounded-lg border border-line p-6 shadow-panel"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
@@ -1720,6 +2224,165 @@ export default function AdminPage() {
     </div>
   );
 
+  const renderActivityGroupList = (
+    title: string,
+    groups: ActivityGroupReview[],
+    variant: "review" | "active" | "inactive",
+  ) => (
+    <div className="rounded-md border border-line bg-white/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
+          {title}
+        </p>
+        <span className="text-xs font-semibold text-muted">{groups.length}</span>
+      </div>
+
+      {groups.length === 0 ? (
+        <p className="px-3 py-4 text-sm text-muted">
+          No activity groups in this section.
+        </p>
+      ) : null}
+
+      <div className="divide-y divide-line">
+        {groups.map((group) => {
+          const draft = activityGroupDrafts[group.id] ?? {
+            name: group.name,
+            activityType: group.activity_type ?? "other",
+            note: group.note ?? "",
+          };
+          const normalizedPreview = normalizeActivityGroupName(draft.name);
+
+          return (
+            <div
+              key={group.id}
+              className="grid gap-2 px-3 py-2 text-sm xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+            >
+              <div className="min-w-0">
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_0.35fr]">
+                  <input
+                    value={draft.name}
+                    onChange={(event) =>
+                      setActivityGroupDrafts((current) => ({
+                        ...current,
+                        [group.id]: {
+                          ...draft,
+                          name: event.target.value,
+                        },
+                      }))
+                    }
+                    className="min-w-0 rounded-md border border-line bg-white px-2 py-1.5 text-sm font-semibold outline-none transition focus:border-brand"
+                    aria-label={`Edit ${group.name}`}
+                  />
+                  <select
+                    value={draft.activityType}
+                    onChange={(event) =>
+                      setActivityGroupDrafts((current) => ({
+                        ...current,
+                        [group.id]: {
+                          ...draft,
+                          activityType: event.target.value,
+                        },
+                      }))
+                    }
+                    className="rounded-md border border-line bg-white px-2 py-1.5 text-sm capitalize outline-none transition focus:border-brand"
+                  >
+                    <option value="conference">Conference</option>
+                    <option value="analysis">Analysis</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span>normalized: {group.normalized_name}</span>
+                  <span>type: {formatActivityType(group.activity_type)}</span>
+                  {group.needs_review ? (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 font-semibold text-accent">
+                      Needs review
+                    </span>
+                  ) : null}
+                </div>
+                {normalizedPreview !== group.normalized_name ? (
+                  <p className="mt-0.5 text-xs text-muted">
+                    new normalized: {normalizedPreview || "TBD"}
+                  </p>
+                ) : null}
+                <input
+                  value={draft.note}
+                  onChange={(event) =>
+                    setActivityGroupDrafts((current) => ({
+                      ...current,
+                      [group.id]: {
+                        ...draft,
+                        note: event.target.value,
+                      },
+                    }))
+                  }
+                  className="mt-2 w-full rounded-md border border-line bg-white px-2 py-1.5 text-xs outline-none transition focus:border-brand"
+                  placeholder="Optional note"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 xl:justify-end">
+                {variant !== "inactive" ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleSaveActivityGroup(group.id)}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground disabled:opacity-60"
+                    >
+                      Save
+                    </button>
+                    {group.needs_review ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          void handleMarkActivityGroupReviewed(group.id)
+                        }
+                        className="rounded-md border border-brand/30 bg-brand-soft px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                      >
+                        Mark reviewed
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleDeactivateActivityGroup(group.id)}
+                      className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                    >
+                      Deactivate
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleReactivateActivityGroup(group.id)}
+                      className="rounded-md border border-brand/30 bg-brand-soft px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+                    >
+                      Reactivate
+                    </button>
+                    {!usedActivityGroupIds.includes(group.id) ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleDeleteActivityGroup(group.id)}
+                        className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-60"
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <PortalShell
       title="Admin"
@@ -1740,6 +2403,47 @@ export default function AdminPage() {
         assignment; do not make student project admins global admins unless they
         need global access.
       </p>
+
+      {!loading && userCanUseAdmin ? (
+        <nav className="sticky top-3 z-10 mt-6 overflow-x-auto rounded-full border border-line bg-white/90 p-2 shadow-panel backdrop-blur">
+          <div className="flex min-w-max gap-2">
+            {userIsGlobalManager ? (
+              <>
+                <a
+                  href="#user-management"
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+                >
+                  User Management
+                </a>
+                <a
+                  href="#funding-sources"
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+                >
+                  Funding Sources
+                </a>
+                <a
+                  href="#project-admins"
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+                >
+                  Project Admins
+                </a>
+              </>
+            ) : null}
+            <a
+              href="#merchant-management"
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+            >
+              Materials / Merchants
+            </a>
+            <a
+              href="#activity-group-management"
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+            >
+              Activities / Activity Groups
+            </a>
+          </div>
+        </nav>
+      ) : null}
 
       {loading ? (
         <div className="portal-card mt-8 rounded-md border border-line p-5 text-sm text-muted">
@@ -1770,7 +2474,10 @@ export default function AdminPage() {
           {userIsGlobalManager ? renderUserManagement() : null}
 
           {userIsGlobalManager ? (
-          <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+          <section
+            id="funding-sources"
+            className="order-2 scroll-mt-28 portal-card rounded-lg border border-line p-6 shadow-panel"
+          >
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
               Funding Sources
             </p>
@@ -1877,9 +2584,14 @@ export default function AdminPage() {
             </form>
 
             <div className="mt-8 grid gap-4">
-              <div>
+              <div id="project-admins" className="scroll-mt-28">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
                   Active Funding Sources
+                </p>
+                <p className="mt-2 text-xs leading-6 text-muted">
+                  Project Admins are assigned inside each active Funding Source
+                  and can manage payment workflows only for their assigned
+                  sources.
                 </p>
                 <div className="mt-4 grid gap-4">
                   {activeFundingSources.length === 0 ? (
@@ -2219,9 +2931,9 @@ export default function AdminPage() {
           </section>
           ) : null}
 
-          <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+          <section className="order-4 portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Merge Merchants
+              Materials / Merchant Merge
             </p>
             <h3 className="mt-3 text-2xl font-semibold">
               Move duplicate merchant history
@@ -2326,18 +3038,160 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <section className="portal-card rounded-lg border border-line p-6 shadow-panel">
+          <section className="order-6 portal-card rounded-lg border border-line p-6 shadow-panel">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-              Merchant Management
+              Activities / Activity Group Merge
+            </p>
+            <h3 className="mt-3 text-2xl font-semibold">
+              Move duplicate activity history
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              Merge a typo or duplicate conference, analysis, or other activity
+              group into an active target. Linked activity purchase requests
+              move to the target group.
+            </p>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  Source activity group
+                </span>
+                <input
+                  value={activityMergeSourceSearch}
+                  onChange={(event) =>
+                    setActivityMergeSourceSearch(event.target.value)
+                  }
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                  placeholder="Search source activity group"
+                />
+                <select
+                  value={activityMergeSourceId}
+                  onChange={(event) => setActivityMergeSourceId(event.target.value)}
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                >
+                  <option value="">Select source activity group</option>
+                  {activitySourceOptions.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {formatActivityType(group.activity_type)} - {group.name}
+                      {group.is_active === false ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  Target activity group
+                </span>
+                <input
+                  value={activityMergeTargetSearch}
+                  onChange={(event) =>
+                    setActivityMergeTargetSearch(event.target.value)
+                  }
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                  placeholder="Search active target activity group"
+                />
+                <select
+                  value={activityMergeTargetId}
+                  onChange={(event) => setActivityMergeTargetId(event.target.value)}
+                  className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+                >
+                  <option value="">Select active target activity group</option>
+                  {activityTargetOptions.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {formatActivityType(group.activity_type)} - {group.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleMergeActivityGroups()}
+                className="rounded-md border border-brand/30 bg-brand-soft px-4 py-2.5 text-sm font-semibold text-brand transition hover:bg-white disabled:opacity-60"
+              >
+                Merge Activity Group
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-2 rounded-md border border-line bg-white/60 p-3 text-sm md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                  Source
+                </p>
+                <p className="mt-1 font-semibold">
+                  {activityMergeSourceGroup
+                    ? `${formatActivityType(
+                        activityMergeSourceGroup.activity_type,
+                      )} - ${activityMergeSourceGroup.name}`
+                    : "Not selected"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                  Target
+                </p>
+                <p className="mt-1 font-semibold">
+                  {activityMergeTargetGroup
+                    ? `${formatActivityType(
+                        activityMergeTargetGroup.activity_type,
+                      )} - ${activityMergeTargetGroup.name}`
+                    : "Not selected"}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section
+            id="activity-group-management"
+            className="order-5 scroll-mt-28 portal-card rounded-lg border border-line p-6 shadow-panel"
+          >
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+              Activities / Activity Group Management
+            </p>
+            <h3 className="mt-3 text-2xl font-semibold">
+              Conference, analysis, and activity groups
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              Activity Groups are used for conference, analysis, and other
+              activity requests. Review, edit, deactivate, and merge Activity
+              Groups without changing material merchant records.
+            </p>
+
+            <div className="mt-6 grid gap-4">
+              {renderActivityGroupList(
+                "Needs Review Activity Groups",
+                needsReviewActivityGroups,
+                "review",
+              )}
+              {renderActivityGroupList(
+                "Active Activity Groups",
+                activeActivityGroups,
+                "active",
+              )}
+              {renderActivityGroupList(
+                "Inactive Activity Groups",
+                inactiveActivityGroups,
+                "inactive",
+              )}
+            </div>
+          </section>
+
+          <section
+            id="merchant-management"
+            className="order-3 scroll-mt-28 portal-card rounded-lg border border-line p-6 shadow-panel"
+          >
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+              Materials / Merchant Management
             </p>
             <h3 className="mt-3 text-2xl font-semibold">
               Compact merchant list
             </h3>
             <p className="mt-3 text-sm leading-7 text-muted">
-              Edit merchant display names, review newly added merchants, and
-              deactivate incorrect entries without deleting merchant history.
-              Deactivated merchants remain visible here but no longer appear in
-              the purchase request selector.
+              Merchants are used for materials requests. Edit merchant display
+              names, review newly added merchants, and deactivate incorrect
+              entries without deleting merchant history.
             </p>
 
             <div className="mt-6 grid gap-4">

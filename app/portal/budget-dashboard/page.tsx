@@ -35,10 +35,19 @@ type Merchant = {
   normalized_name: string;
 };
 
+type ActivityGroup = {
+  id: string;
+  name: string;
+  activity_type: string | null;
+};
+
 type PurchaseRequest = {
   id: string;
   merchant_id: string | null;
-  merchant: string;
+  merchant: string | null;
+  activity_group_id: string | null;
+  activity_group_name: string | null;
+  activity_type: string | null;
   item_name: string;
   cost_category: CostCategory | null;
   estimated_cost: number | null;
@@ -58,9 +67,11 @@ type BudgetSummary = {
 };
 
 const requestSelect =
-  "id, merchant_id, merchant, item_name, cost_category, estimated_cost, currency, status, funding_source_id, requested_at, paid_at";
+  "id, merchant_id, merchant, activity_group_id, activity_group_name, activity_type, item_name, cost_category, estimated_cost, currency, status, funding_source_id, requested_at, paid_at";
 
 const merchantSelect = "id, name, normalized_name";
+
+const activityGroupSelect = "id, name, activity_type";
 
 function normalizeMerchantName(value: string) {
   return value
@@ -68,6 +79,16 @@ function normalizeMerchantName(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function formatActivityType(value: string | null | undefined) {
+  if (!value) {
+    return "Activity";
+  }
+
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) =>
+    letter.toUpperCase(),
+  );
 }
 
 function formatAmount(value: number, currency = "KRW") {
@@ -137,21 +158,41 @@ function getPaidAmount(requests: PurchaseRequest[], sourceId: string, category: 
 function getMerchantTotals(
   requests: PurchaseRequest[],
   merchantMap: Record<string, Merchant>,
+  activityGroupMap: Record<string, ActivityGroup>,
 ) {
   return requests
     .filter((request) => request.status === "pending_payment")
     .reduce<Record<string, { name: string; total: number }>>((accumulator, request) => {
-      const merchantRecord = request.merchant_id
-        ? merchantMap[request.merchant_id]
+      const isActivity =
+        request.cost_category === "activities" ||
+        Boolean(request.activity_group_id || request.activity_group_name);
+      const activityGroupRecord = request.activity_group_id
+        ? activityGroupMap[request.activity_group_id]
         : undefined;
-      const merchantName =
-        merchantRecord?.name || request.merchant || "Unknown merchant";
-      const fallbackKey = normalizeMerchantName(merchantName) || "unknown";
-      const key = request.merchant_id
-        ? `merchant:${request.merchant_id}`
-        : `text:${fallbackKey}`;
+      const merchantRecord =
+        !isActivity && request.merchant_id
+          ? merchantMap[request.merchant_id]
+          : undefined;
+      const name = isActivity
+        ? `${formatActivityType(
+            request.activity_type || activityGroupRecord?.activity_type,
+          )} · ${
+            activityGroupRecord?.name ||
+            request.activity_group_name ||
+            request.merchant ||
+            "Unknown activity"
+          }`
+        : merchantRecord?.name || request.merchant || "Unknown merchant";
+      const fallbackKey = normalizeMerchantName(name) || "unknown";
+      const key = isActivity
+        ? request.activity_group_id
+          ? `activity:${request.activity_group_id}`
+          : `activity:text:${fallbackKey}`
+        : request.merchant_id
+          ? `merchant:${request.merchant_id}`
+          : `merchant:text:${fallbackKey}`;
 
-      accumulator[key] ??= { name: merchantName, total: 0 };
+      accumulator[key] ??= { name, total: 0 };
       accumulator[key].total += request.estimated_cost ?? 0;
       return accumulator;
     }, {});
@@ -164,6 +205,9 @@ function canViewAllFundingSources(role: string | null) {
 export default function BudgetDashboardPage() {
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
+  const [activityGroupMap, setActivityGroupMap] = useState<
+    Record<string, ActivityGroup>
+  >({});
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [managedFundingSourceIds, setManagedFundingSourceIds] = useState<
@@ -191,6 +235,7 @@ export default function BudgetDashboardPage() {
       setFundingSources([]);
       setRequests([]);
       setMerchantMap({});
+      setActivityGroupMap({});
       setErrorMessage("Please sign in again before viewing budgets.");
       setLoading(false);
       return;
@@ -245,6 +290,7 @@ export default function BudgetDashboardPage() {
     if (requestsResult.error) {
       setRequests([]);
       setMerchantMap({});
+      setActivityGroupMap({});
       setErrorMessage(requestsResult.error.message);
     } else {
       const nextRequests = (requestsResult.data ?? []) as PurchaseRequest[];
@@ -257,24 +303,42 @@ export default function BudgetDashboardPage() {
             .filter((id): id is string => Boolean(id)),
         ),
       );
+      const activityGroupIds = Array.from(
+        new Set(
+          nextRequests
+            .map((request) => request.activity_group_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
 
-      if (merchantIds.length > 0) {
-        const { data: merchants } = await supabase
-          .from("merchants")
-          .select(merchantSelect)
-          .in("id", merchantIds);
+      const [merchantsResult, activityGroupsResult] = await Promise.all([
+        merchantIds.length > 0
+          ? supabase.from("merchants").select(merchantSelect).in("id", merchantIds)
+          : Promise.resolve({ data: [], error: null }),
+        activityGroupIds.length > 0
+          ? supabase
+              .from("activity_groups")
+              .select(activityGroupSelect)
+              .in("id", activityGroupIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-        const nextMerchantMap = ((merchants ?? []) as Merchant[]).reduce<
-          Record<string, Merchant>
-        >((accumulator, merchant) => {
-          accumulator[merchant.id] = merchant;
-          return accumulator;
-        }, {});
+      const nextMerchantMap = ((merchantsResult.data ?? []) as Merchant[]).reduce<
+        Record<string, Merchant>
+      >((accumulator, merchant) => {
+        accumulator[merchant.id] = merchant;
+        return accumulator;
+      }, {});
 
-        setMerchantMap(nextMerchantMap);
-      } else {
-        setMerchantMap({});
-      }
+      const nextActivityGroupMap = (
+        (activityGroupsResult.data ?? []) as ActivityGroup[]
+      ).reduce<Record<string, ActivityGroup>>((accumulator, group) => {
+        accumulator[group.id] = group;
+        return accumulator;
+      }, {});
+
+      setMerchantMap(nextMerchantMap);
+      setActivityGroupMap(nextActivityGroupMap);
     }
 
     setLoading(false);
@@ -303,8 +367,8 @@ export default function BudgetDashboardPage() {
   );
 
   const pendingMerchantTotals = useMemo(
-    () => Object.values(getMerchantTotals(requests, merchantMap)),
-    [merchantMap, requests],
+    () => Object.values(getMerchantTotals(requests, merchantMap, activityGroupMap)),
+    [activityGroupMap, merchantMap, requests],
   );
 
   const budgetTotals = useMemo(
