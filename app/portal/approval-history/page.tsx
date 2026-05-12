@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FundingSourceStatusSummary } from "@/components/funding-source-status-summary";
 import { PortalShell } from "@/components/portal-shell";
 import { logPortalActivity } from "@/lib/portal-activity";
 import { supabase } from "@/lib/supabase/client";
@@ -950,6 +951,15 @@ export default function PaymentTrackerPage() {
             Selected Pending Payment items: {selectedRequestIds.length}
           </p>
         </section>
+      ) : null}
+
+      {userCanManagePayments ? (
+        <FundingSourceStatusSummary
+          className="mt-8"
+          emptyMessage="No active funding sources to summarize."
+          restrictToVisibleIds
+          visibleFundingSourceIds={fundingSources.map((source) => source.id)}
+        />
       ) : null}
 
       <section className="mt-9">

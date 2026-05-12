@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
+import { FundingSourceStatusSummary } from "@/components/funding-source-status-summary";
 import { logPortalActivity } from "@/lib/portal-activity";
 import { supabase } from "@/lib/supabase/client";
 
@@ -261,6 +262,7 @@ export function PurchaseRequestPanel() {
     null,
   );
   const [merchantDropdownOpen, setMerchantDropdownOpen] = useState(false);
+  const [highlightedMerchantIndex, setHighlightedMerchantIndex] = useState(0);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [merchantMap, setMerchantMap] = useState<Record<string, Merchant>>({});
   const [activityGroupSearch, setActivityGroupSearch] = useState("");
@@ -468,7 +470,7 @@ export function PurchaseRequestPanel() {
     const normalizedSearch = normalizeMerchantName(merchantSearch);
 
     if (!search) {
-      return merchants.slice(0, 6);
+      return merchants;
     }
 
     return merchants
@@ -547,9 +549,44 @@ export function PurchaseRequestPanel() {
   const handleMerchantSearchChange = (value: string) => {
     setMerchantSearch(value);
     setMerchantDropdownOpen(true);
+    setHighlightedMerchantIndex(0);
 
     if (selectedMerchant && selectedMerchant.name !== value) {
       setSelectedMerchant(null);
+    }
+  };
+
+  const handleMerchantKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setMerchantDropdownOpen(true);
+      setHighlightedMerchantIndex((current) =>
+        Math.min(current + 1, Math.max(filteredMerchants.length - 1, 0)),
+      );
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setMerchantDropdownOpen(true);
+      setHighlightedMerchantIndex((current) => Math.max(current - 1, 0));
+    }
+
+    if (event.key === "Enter" && merchantDropdownOpen) {
+      const highlightedMerchant = filteredMerchants[highlightedMerchantIndex];
+
+      if (highlightedMerchant) {
+        event.preventDefault();
+        selectMerchant(highlightedMerchant);
+      }
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setMerchantDropdownOpen(false);
     }
   };
 
@@ -1313,19 +1350,30 @@ export function PurchaseRequestPanel() {
               <input
                 required
                 value={merchantSearch}
-                onFocus={() => setMerchantDropdownOpen(true)}
+                role="combobox"
+                aria-controls="merchant-options"
+                aria-expanded={merchantDropdownOpen}
+                aria-autocomplete="list"
+                onFocus={() => {
+                  setMerchantDropdownOpen(true);
+                  setHighlightedMerchantIndex(0);
+                }}
                 onBlur={() => {
                   window.setTimeout(() => setMerchantDropdownOpen(false), 120);
                 }}
                 onChange={(event) =>
                   handleMerchantSearchChange(event.target.value)
                 }
+                onKeyDown={handleMerchantKeyDown}
                 className="w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand focus:shadow-sm sm:px-4 sm:py-3"
                 placeholder="Search existing merchants"
               />
 
               {merchantDropdownOpen ? (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-md border border-line bg-white p-2 shadow-panel">
+                <div
+                  id="merchant-options"
+                  className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-md border border-line bg-white p-2 shadow-panel"
+                >
                   {merchantsLoading ? (
                     <p className="px-3 py-2 text-sm text-muted">
                       Loading merchants...
@@ -1340,14 +1388,16 @@ export function PurchaseRequestPanel() {
 
                   {!merchantsLoading && filteredMerchants.length > 0 ? (
                     <div className="grid gap-1">
-                      {filteredMerchants.map((merchant) => (
+                      {filteredMerchants.map((merchant, index) => (
                         <button
                           key={merchant.id}
                           type="button"
                           onMouseDown={(event) => event.preventDefault()}
+                          onMouseEnter={() => setHighlightedMerchantIndex(index)}
                           onClick={() => selectMerchant(merchant)}
                           className={`rounded-md px-3 py-2 text-left text-sm font-semibold transition ${
-                            selectedMerchant?.id === merchant.id
+                            selectedMerchant?.id === merchant.id ||
+                            highlightedMerchantIndex === index
                               ? "bg-brand-soft text-brand"
                               : "text-muted hover:bg-brand-soft hover:text-foreground"
                           }`}
@@ -1958,6 +2008,11 @@ export function PurchaseRequestPanel() {
         ) : null}
 
       </section>
+
+      <FundingSourceStatusSummary
+        className="mt-10"
+        emptyMessage="No active funding sources are available."
+      />
     </div>
   );
 }
