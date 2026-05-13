@@ -56,10 +56,11 @@ export function FullImagePreview({
             >
               Close
             </button>
-            <img
-              src={src}
-              alt={alt}
-              className="max-h-[60vh] max-w-[90vw] rounded-lg object-contain shadow-panel sm:max-h-[70vh] sm:max-w-[60vw]"
+            <div
+              className="h-[60vh] w-[90vw] rounded-lg bg-contain bg-center bg-no-repeat shadow-panel sm:h-[70vh] sm:w-[60vw]"
+              style={{ backgroundImage: `url(${src})` }}
+              role="img"
+              aria-label={alt}
             />
           </div>
         </div>,

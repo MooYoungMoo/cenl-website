@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import {
   BriefcaseBusiness,
+  Building2,
   ExternalLink,
   Mail,
   Medal,
+  Phone,
   School,
 } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
@@ -30,6 +32,22 @@ function TimelineDate({ item }: { item: PiTimelineItem }) {
   return <span>{item.startDate || item.endDate || "TBD"}</span>;
 }
 
+function splitTimelineNotes(note: string) {
+  const notes = note
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const advisors = notes
+    .filter((item) => item.toLowerCase().startsWith("advisor:"))
+    .map((item) => item.replace(/^advisor:\s*/i, "").trim())
+    .filter(Boolean);
+  const details = notes.filter(
+    (item) => !item.toLowerCase().startsWith("advisor:"),
+  );
+
+  return { advisors, details };
+}
+
 function TimelineList({
   items,
   wide = false,
@@ -39,48 +57,59 @@ function TimelineList({
 }) {
   return (
     <div className="mt-8 space-y-7">
-      {items.map((item, index) => (
-        <div
-          key={`${item.startDate}-${item.title}-${index}`}
-          className={`grid gap-5 border-l border-line pl-5 ${
-            wide ? "md:grid-cols-[150px_1fr]" : "md:grid-cols-[170px_1fr]"
-          }`}
-        >
-          <p className="text-sm font-semibold leading-6 text-brand">
-            <TimelineDate item={item} />
-          </p>
-          <div>
-            <h3 className="font-semibold leading-7">{item.title}</h3>
-            {item.organization ? (
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {item.organization}
-              </p>
-            ) : null}
-            {item.location ? (
-              <p className="mt-1 text-sm font-medium text-muted">
-                {item.location}
-              </p>
-            ) : null}
-            {item.description ? (
-              <p className="mt-2 text-sm leading-7 text-muted">
-                {item.description}
-              </p>
-            ) : null}
-            {item.note ? (
-              <div className="mt-3 space-y-2">
-                {item.note.split("\n").map((note) => (
-                  <p
-                    key={note}
-                    className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm leading-6 text-muted"
-                  >
-                    {note}
-                  </p>
-                ))}
-              </div>
-            ) : null}
+      {items.map((item, index) => {
+        const { advisors, details } = splitTimelineNotes(item.note);
+
+        return (
+          <div
+            key={`${item.startDate}-${item.title}-${index}`}
+            className={`grid gap-5 border-l border-line pl-5 ${
+              wide ? "md:grid-cols-[150px_1fr]" : "md:grid-cols-[170px_1fr]"
+            }`}
+          >
+            <p className="text-sm font-semibold leading-6 text-brand">
+              <TimelineDate item={item} />
+            </p>
+            <div>
+              <h3 className="font-semibold leading-7">
+                {item.title}
+                {advisors.length > 0 ? (
+                  <span className="ml-1 text-sm font-normal text-muted">
+                    - Advisor: {advisors.join("; ")}
+                  </span>
+                ) : null}
+              </h3>
+              {item.organization ? (
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {item.organization}
+                </p>
+              ) : null}
+              {item.location ? (
+                <p className="mt-1 text-sm font-medium text-muted">
+                  {item.location}
+                </p>
+              ) : null}
+              {item.description ? (
+                <p className="mt-2 text-sm leading-7 text-muted">
+                  {item.description}
+                </p>
+              ) : null}
+              {details.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {details.map((note) => (
+                    <p
+                      key={note}
+                      className="text-sm leading-6 text-muted"
+                    >
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -162,6 +191,20 @@ export function PiProfileContentSection() {
                 {email}
               </a>
             ))}
+            {profile.office ? (
+              <p className="flex w-fit flex-wrap items-center gap-2 text-sm font-medium text-muted">
+                <Building2 className="h-4 w-4 text-brand" />
+                <span className="font-semibold text-foreground">Office:</span>
+                {profile.office}
+              </p>
+            ) : null}
+            {profile.phone ? (
+              <p className="flex w-fit flex-wrap items-center gap-2 text-sm font-medium text-muted">
+                <Phone className="h-4 w-4 text-brand" />
+                <span className="font-semibold text-foreground">Phone:</span>
+                {profile.phone}
+              </p>
+            ) : null}
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             {profile.externalLinks.map((externalLink) =>

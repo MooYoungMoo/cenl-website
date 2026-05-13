@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FlaskConical, Mail } from "lucide-react";
+import { FlaskConical, Mail, Network } from "lucide-react";
 import { LatestNewsSection } from "@/components/latest-news-section";
 import { LatestPublicationsSection } from "@/components/latest-publications-section";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
@@ -13,45 +13,26 @@ import {
 } from "@/lib/home";
 import { fetchHomeMetrics } from "@/lib/home-metrics";
 import { fetchVisibleResearchTopics } from "@/lib/research";
-import { homeFeatureLinks, quickStats } from "@/lib/site-data";
+import { quickStats } from "@/lib/site-data";
 
 const researchIdentityCards = [
   {
     title: "Conductive Frameworks",
-    description:
-      "Conductive MOFs and porous materials for molecular recognition and charge transport.",
   },
   {
     title: "Nanostructured Oxides",
-    description:
-      "Porous, hollow, and hierarchical oxide materials for high-reactivity sensing films.",
   },
   {
     title: "Light-Activated Sensors",
-    description:
-      "Band-structure and photoactivation strategies for room-temperature gas sensing.",
   },
   {
     title: "Gas Fingerprints",
-    description:
-      "Sensor arrays and pattern recognition for information-rich chemical sensing.",
   },
 ];
 
 type HomeResearchCard = {
   title: string;
-  description: string;
 };
-
-function trimResearchDescription(value: string) {
-  const trimmed = value.trim();
-
-  if (trimmed.length <= 150) {
-    return trimmed;
-  }
-
-  return `${trimmed.slice(0, 147).trim()}...`;
-}
 
 export function HomePageContentSection() {
   const [content, setContent] =
@@ -98,11 +79,8 @@ export function HomePageContentSection() {
     const loadResearchCards = async () => {
       try {
         const topics = await fetchVisibleResearchTopics();
-        const nextCards = topics.slice(0, 4).map((topic) => ({
+        const nextCards = topics.map((topic) => ({
           title: topic.title,
-          description: trimResearchDescription(
-            topic.subtitle || topic.summary || topic.description,
-          ),
         }));
 
         if (mounted && nextCards.length > 0) {
@@ -187,64 +165,44 @@ export function HomePageContentSection() {
 
       <LatestPublicationsSection title={content.latestPublicationsTitle} />
 
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
-        <div className="rounded-xl border border-line/70 bg-white/75 p-5 shadow-panel sm:p-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">
-                Research Directions
-              </p>
-              <h2 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">
-                From Molecules to Gas Fingerprints
-              </h2>
-            </div>
-            <Link
-              href="/research"
-              className="rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
-            >
-              Explore research
-            </Link>
+      <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 md:py-9">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-brand-soft text-brand">
+              <Network className="h-5 w-5" />
+            </span>
+            <h2 className="break-words text-3xl font-semibold text-foreground sm:text-4xl">
+              Research Directions
+            </h2>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {researchCards.map((card) => (
-              <div
-                key={card.title}
-                className="rounded-lg border border-line/70 bg-surface/85 p-4"
+          <Link
+            href="/research"
+            className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+          >
+            Explore research
+          </Link>
+        </div>
+        <div className="mt-5 w-full overflow-x-auto pb-3">
+          <div className="flex min-w-max flex-nowrap gap-4">
+            {researchCards.map((card, index) => (
+              <Link
+                key={`${card.title}-${index}`}
+                href="/research"
+                className="flex min-h-[150px] w-[220px] shrink-0 flex-col justify-between rounded-lg border border-brand/15 bg-white/85 p-4 shadow-sm transition hover:border-brand/35 hover:bg-brand-soft/40 sm:w-[240px] md:w-[260px]"
               >
-                <h3 className="line-clamp-1 text-sm font-semibold text-foreground">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand/70">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <h3 className="mt-4 line-clamp-3 text-lg font-semibold leading-snug text-foreground">
                   {card.title}
                 </h3>
-                <p className="mt-2 line-clamp-2 text-xs leading-6 text-muted">
-                  {card.description}
-                </p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
       <LatestNewsSection title={content.latestNewsTitle} />
-
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-12 sm:px-6 md:grid-cols-3 md:py-16">
-        {homeFeatureLinks.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="elevated-card min-w-0 border border-line bg-surface p-5 sm:p-6"
-            >
-              <Icon className="h-6 w-6 text-brand" />
-              <h2 className="mt-5 break-words text-xl font-semibold">
-                {item.title}
-              </h2>
-              <p className="mt-3 break-words text-sm leading-7 text-muted">
-                {item.description}
-              </p>
-            </Link>
-          );
-        })}
-      </section>
     </div>
   );
 }

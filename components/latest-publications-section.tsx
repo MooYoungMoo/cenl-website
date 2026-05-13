@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BookOpen } from "lucide-react";
 import { PublicationCarousel } from "@/components/publication-carousel";
-import { SectionHeading } from "@/components/section-heading";
 import { fetchFeaturedPublications } from "@/lib/publications";
 import { latestPublications, type PublicationItem } from "@/lib/site-data";
 
@@ -11,9 +11,11 @@ type LatestPublicationsSectionProps = {
 };
 
 export function LatestPublicationsSection({
-  title = "Our Latest Publications",
+  title = "Latest Publications",
 }: LatestPublicationsSectionProps) {
   const [items, setItems] = useState<PublicationItem[]>(latestPublications);
+  const displayTitle =
+    title.trim().replace(/^our\s+/i, "") || "Latest Publications";
 
   useEffect(() => {
     let mounted = true;
@@ -41,11 +43,14 @@ export function LatestPublicationsSection({
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
-      <SectionHeading
-        eyebrow="Publications"
-        title={title}
-        description="A concise preview of recent CENL papers with journal information kept easy to scan."
-      />
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-brand-soft text-brand">
+          <BookOpen className="h-4 w-4" />
+        </span>
+        <h2 className="break-words text-2xl font-semibold text-foreground sm:text-3xl">
+          {displayTitle}
+        </h2>
+      </div>
       <div className="mt-3">
         <PublicationCarousel items={items} />
       </div>

@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { SectionHeading } from "@/components/section-heading";
-import { fetchFeaturedNewsPosts } from "@/lib/news";
+import { ArrowRight, Newspaper } from "lucide-react";
+import { fetchVisibleNewsPosts } from "@/lib/news";
 import { newsItems, type NewsItem } from "@/lib/site-data";
 
 type LatestNewsSectionProps = {
@@ -12,23 +11,27 @@ type LatestNewsSectionProps = {
 };
 
 export function LatestNewsSection({
-  title = "Recent activity from CENL",
+  title = "Latest News",
 }: LatestNewsSectionProps) {
-  const [items, setItems] = useState<NewsItem[]>(newsItems.slice(0, 3));
+  const [items, setItems] = useState<NewsItem[]>(newsItems.slice(0, 15));
+  const displayTitle =
+    title.trim().toLowerCase() === "recent activity from cenl"
+      ? "Latest News"
+      : title.trim() || "Latest News";
 
   useEffect(() => {
     let mounted = true;
 
     const loadNews = async () => {
       try {
-        const posts = await fetchFeaturedNewsPosts(3);
+        const posts = await fetchVisibleNewsPosts();
 
         if (mounted && posts.length > 0) {
-          setItems(posts);
+          setItems(posts.slice(0, 15));
         }
       } catch {
         if (mounted) {
-          setItems(newsItems.slice(0, 3));
+          setItems(newsItems.slice(0, 15));
         }
       }
     };
@@ -42,35 +45,35 @@ export function LatestNewsSection({
 
   return (
     <section className="bg-[#eef3f6]">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16">
-        <SectionHeading
-          eyebrow="Latest News"
-          title={title}
-          description="News cards highlight featured lab updates from awards, events, research, and general lab activity."
-        />
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-brand-soft text-brand">
+            <Newspaper className="h-5 w-5" />
+          </span>
+          <h2 className="break-words text-3xl font-semibold text-foreground sm:text-4xl">
+            {displayTitle}
+          </h2>
+        </div>
         {items.length === 0 ? (
-          <div className="mt-8 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
-            No featured news posts are available yet.
+          <div className="mt-5 rounded-lg border border-dashed border-line bg-white/70 p-6 text-sm text-muted">
+            No news posts are available yet.
           </div>
         ) : null}
-        <div className="mt-8 grid gap-5 sm:mt-10 lg:grid-cols-3">
+        <div className="mt-5 max-h-[430px] overflow-y-auto rounded-lg border border-line/70 bg-white/80 shadow-sm">
           {items.map((item) => (
             <article
               key={item.slug}
-              className="elevated-card min-w-0 border border-line bg-white p-5 sm:p-6"
+              className="grid gap-2 border-b border-line/70 px-3 py-3 last:border-b-0 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
             >
-              <p className="text-sm font-medium text-brand">{item.date}</p>
-              <h3 className="mt-3 break-words text-xl font-semibold">
+              <p className="text-sm font-semibold text-brand">{item.date}</p>
+              <h3 className="min-w-0 truncate text-base font-semibold text-foreground">
                 {item.title}
               </h3>
-              <p className="mt-3 break-words text-sm leading-7 text-muted">
-                {item.summary}
-              </p>
               <Link
                 href={`/news/${item.slug}`}
-                className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand"
+                className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-brand transition hover:text-foreground"
               >
-                Read more
+                Read More
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </article>

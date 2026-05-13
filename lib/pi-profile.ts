@@ -18,6 +18,8 @@ export type SupabasePiProfileContent = {
   affiliation: string | null;
   email_primary: string | null;
   email_secondary: string | null;
+  office: string | null;
+  phone: string | null;
   photo_url: string | null;
   google_scholar_url: string | null;
   orcid_url: string | null;
@@ -35,6 +37,8 @@ export type PiProfileContent = {
   position: string;
   affiliation: string;
   emails: string[];
+  office: string;
+  phone: string;
   photoUrl: string;
   externalLinks: {
     label: string;
@@ -47,7 +51,7 @@ export type PiProfileContent = {
 };
 
 export const piProfileSelect =
-  "id, name, position, affiliation, email_primary, email_secondary, photo_url, google_scholar_url, orcid_url, linkedin_url, education_career, professional_experiences, awards_honors, updated_by, created_at, updated_at";
+  "id, name, position, affiliation, email_primary, email_secondary, office, phone, photo_url, google_scholar_url, orcid_url, linkedin_url, education_career, professional_experiences, awards_honors, updated_by, created_at, updated_at";
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -92,6 +96,8 @@ export const fallbackPiProfileContent: PiProfileContent = {
   position: piProfile.position,
   affiliation: piProfile.affiliation.join("\n"),
   emails: piProfile.emails,
+  office: "",
+  phone: "",
   photoUrl: "",
   externalLinks: piProfile.externalProfiles.map((label) => ({
     label,
@@ -162,6 +168,8 @@ export function mapPiProfileContent(
     position,
     affiliation,
     emails: emails.length ? emails : fallbackPiProfileContent.emails,
+    office: content.office?.trim() ?? "",
+    phone: content.phone?.trim() ?? "",
     photoUrl: content.photo_url ?? "",
     externalLinks: [
       { label: "Google Scholar", url: content.google_scholar_url ?? "" },

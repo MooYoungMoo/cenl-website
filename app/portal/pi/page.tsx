@@ -102,6 +102,8 @@ function getPiPayload(form: PiForm, userId: string | null, photoUrl?: string | n
     affiliation: form.affiliation.trim(),
     email_primary: form.emailPrimary.trim(),
     email_secondary: form.emailSecondary.trim() || null,
+    office: form.office.trim() || null,
+    phone: form.phone.trim() || null,
     photo_url: nextPhotoUrl,
     google_scholar_url: form.googleScholarUrl.trim() || null,
     orcid_url: form.orcidUrl.trim() || null,
@@ -671,6 +673,18 @@ export default function PortalPiManagementPage() {
               }
               className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
               placeholder="Secondary email"
+            />
+            <input
+              value={piForm.office}
+              onChange={(event) => updatePiForm("office", event.target.value)}
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+              placeholder="Office"
+            />
+            <input
+              value={piForm.phone}
+              onChange={(event) => updatePiForm("phone", event.target.value)}
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+              placeholder="Phone"
             />
             <input
               value={piForm.googleScholarUrl}
