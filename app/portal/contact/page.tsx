@@ -9,6 +9,10 @@ import {
   type ContactPageContent,
   type SupabaseContactContent,
 } from "@/lib/contact";
+import {
+  canManageWebsiteSection,
+  getEnabledWebsiteSectionsFromRows,
+} from "@/lib/portal-permissions";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -18,6 +22,11 @@ type Profile = {
 type FundingSourceManager = {
   funding_source_id: string;
   user_id: string;
+};
+
+type WebsitePermission = {
+  section: string | null;
+  is_enabled: boolean | null;
 };
 
 type ContactForm = {
@@ -36,10 +45,6 @@ type ContactForm = {
 
 const contactSelect =
   "id, recruiting_title, recruiting_description, recruiting_areas, application_emails, lab_name, contact_person, contact_role, contact_email, address, map_url, map_embed_url, updated_by, created_at, updated_at";
-
-function canManage(role: string | null) {
-  return role === "professor" || role === "admin" || role === "lab_manager";
-}
 
 function listToText(values: string[]) {
   return values.join("\n");
@@ -104,6 +109,9 @@ function validateContactForm(form: ContactForm) {
 
 export default function PortalContactPage() {
   const [role, setRole] = useState<string | null>(null);
+  const [enabledWebsiteSections, setEnabledWebsiteSections] = useState<string[]>(
+    [],
+  );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [, setUserIsProjectAdmin] = useState(false);
   const [contactForm, setContactForm] = useState<ContactForm>(
@@ -114,7 +122,11 @@ export default function PortalContactPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageContact = canManage(role);
+  const userCanManageContact = canManageWebsiteSection({
+    role,
+    enabledSections: enabledWebsiteSections,
+    section: "contact",
+  });
 
   const loadContactContent = useCallback(async () => {
     const { data, error } = await supabase
@@ -149,6 +161,7 @@ export default function PortalContactPage() {
 
     if (userError || !user) {
       setRole(null);
+      setEnabledWebsiteSections([]);
       setCurrentUserId(null);
       setUserIsProjectAdmin(false);
       setErrorMessage("Please sign in again before managing contact content.");
@@ -158,9 +171,13 @@ export default function PortalContactPage() {
 
     setCurrentUserId(user.id);
 
-    const [profileResult, managersResult] = await Promise.all([
+    const [profileResult, managersResult, permissionsResult] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supabase.from("funding_source_managers").select("funding_source_id, user_id"),
+      supabase
+        .from("website_management_permissions")
+        .select("section, is_enabled")
+        .eq("user_id", user.id),
     ]);
 
     if (profileResult.error) {
@@ -174,14 +191,24 @@ export default function PortalContactPage() {
       ((profileResult.data as Profile | null)?.role ?? null)?.toLowerCase() ??
       null;
     const nextManagers = (managersResult.data ?? []) as FundingSourceManager[];
+    const nextEnabledWebsiteSections = getEnabledWebsiteSectionsFromRows(
+      (permissionsResult.data ?? []) as WebsitePermission[],
+    );
     const hasProjectAdminAccess = nextManagers.some(
       (manager) => manager.user_id === user.id,
     );
 
     setRole(nextRole);
+    setEnabledWebsiteSections(nextEnabledWebsiteSections);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole)) {
+    if (
+      canManageWebsiteSection({
+        role: nextRole,
+        enabledSections: nextEnabledWebsiteSections,
+        section: "contact",
+      })
+    ) {
       await loadContactContent();
     }
 

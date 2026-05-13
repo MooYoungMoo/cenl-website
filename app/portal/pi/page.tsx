@@ -5,6 +5,10 @@ import type { ChangeEvent, FormEvent } from "react";
 import { ArrowDown, ArrowUp, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
 import {
+  canManageWebsiteSection,
+  getEnabledWebsiteSectionsFromRows,
+} from "@/lib/portal-permissions";
+import {
   fallbackPiProfileContent,
   mapPiProfileContent,
   piProfileSelect,
@@ -21,6 +25,11 @@ type Profile = {
 type FundingSourceManager = {
   funding_source_id: string;
   user_id: string;
+};
+
+type WebsitePermission = {
+  section: string | null;
+  is_enabled: boolean | null;
 };
 
 type PiForm = PiProfileContent & {
@@ -48,10 +57,6 @@ const emptyTimelineItem: PiTimelineItem = {
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
-function canManage(role: string | null) {
-  return role === "professor" || role === "admin" || role === "lab_manager";
-}
 
 function toPiForm(content: PiProfileContent): PiForm {
   const googleScholarUrl =
@@ -174,6 +179,9 @@ async function uploadPiPhotoToStorage(file: File) {
 
 export default function PortalPiManagementPage() {
   const [role, setRole] = useState<string | null>(null);
+  const [enabledWebsiteSections, setEnabledWebsiteSections] = useState<string[]>(
+    [],
+  );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [, setUserIsProjectAdmin] = useState(false);
   const [piForm, setPiForm] = useState<PiForm>(
@@ -187,7 +195,11 @@ export default function PortalPiManagementPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManagePi = canManage(role);
+  const userCanManagePi = canManageWebsiteSection({
+    role,
+    enabledSections: enabledWebsiteSections,
+    section: "pi",
+  });
 
   const loadPiContent = useCallback(async () => {
     const { data, error } = await supabase
@@ -220,6 +232,7 @@ export default function PortalPiManagementPage() {
 
     if (userError || !user) {
       setRole(null);
+      setEnabledWebsiteSections([]);
       setCurrentUserId(null);
       setUserIsProjectAdmin(false);
       setErrorMessage("Please sign in again before managing the PI profile.");
@@ -229,9 +242,13 @@ export default function PortalPiManagementPage() {
 
     setCurrentUserId(user.id);
 
-    const [profileResult, managersResult] = await Promise.all([
+    const [profileResult, managersResult, permissionsResult] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supabase.from("funding_source_managers").select("funding_source_id, user_id"),
+      supabase
+        .from("website_management_permissions")
+        .select("section, is_enabled")
+        .eq("user_id", user.id),
     ]);
 
     if (profileResult.error) {
@@ -245,14 +262,24 @@ export default function PortalPiManagementPage() {
       ((profileResult.data as Profile | null)?.role ?? null)?.toLowerCase() ??
       null;
     const nextManagers = (managersResult.data ?? []) as FundingSourceManager[];
+    const nextEnabledWebsiteSections = getEnabledWebsiteSectionsFromRows(
+      (permissionsResult.data ?? []) as WebsitePermission[],
+    );
     const hasProjectAdminAccess = nextManagers.some(
       (manager) => manager.user_id === user.id,
     );
 
     setRole(nextRole);
+    setEnabledWebsiteSections(nextEnabledWebsiteSections);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole)) {
+    if (
+      canManageWebsiteSection({
+        role: nextRole,
+        enabledSections: nextEnabledWebsiteSections,
+        section: "pi",
+      })
+    ) {
       await loadPiContent();
     }
 

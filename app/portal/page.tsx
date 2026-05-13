@@ -7,6 +7,7 @@ import { PortalAuthGuard } from "@/components/portal-auth-guard";
 import { PortalLogoutButton } from "@/components/portal-logout-button";
 import {
   filterPortalNavigationSections,
+  getEnabledWebsiteSectionsFromRows,
   normalizePortalRole,
 } from "@/lib/portal-permissions";
 import { portalNavigationSections } from "@/lib/site-data";
@@ -20,17 +21,26 @@ type FundingSourceManager = {
   funding_source_id: string;
 };
 
+type WebsitePermission = {
+  section: string | null;
+  is_enabled: boolean | null;
+};
+
 export default function PortalPage() {
   const [role, setRole] = useState<string | null>(null);
   const [isProjectAdmin, setIsProjectAdmin] = useState(false);
+  const [enabledWebsiteSections, setEnabledWebsiteSections] = useState<string[]>(
+    [],
+  );
   const visibleNavigationSections = useMemo(
     () =>
       filterPortalNavigationSections({
         sections: portalNavigationSections,
         role,
         isProjectAdmin,
+        enabledWebsiteSections,
       }),
-    [isProjectAdmin, role],
+    [enabledWebsiteSections, isProjectAdmin, role],
   );
   const paymentLinks =
     visibleNavigationSections.find((section) => section.title === "Payment & Budget")
@@ -61,7 +71,8 @@ export default function PortalPage() {
     "Manage Merchants and Funding Sources in Admin",
   ];
   const roleNotes = [
-    "Lab Manager: manages public website content.",
+    "Lab Manager: manages all public website content sections.",
+    "Website Section Permissions: let a student manage selected website pages only.",
     "Project Admin: manages assigned Funding Source payment workflows.",
     "Student: submits purchase requests and tracks personal request status.",
   ];
@@ -78,11 +89,15 @@ export default function PortalPage() {
         return;
       }
 
-      const [profileResult, managersResult] = await Promise.all([
+      const [profileResult, managersResult, permissionsResult] = await Promise.all([
         supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
         supabase
           .from("funding_source_managers")
           .select("funding_source_id")
+          .eq("user_id", user.id),
+        supabase
+          .from("website_management_permissions")
+          .select("section, is_enabled")
           .eq("user_id", user.id),
       ]);
 
@@ -95,6 +110,11 @@ export default function PortalPage() {
       );
       setIsProjectAdmin(
         ((managersResult.data ?? []) as FundingSourceManager[]).length > 0,
+      );
+      setEnabledWebsiteSections(
+        getEnabledWebsiteSectionsFromRows(
+          (permissionsResult.data ?? []) as WebsitePermission[],
+        ),
       );
     };
 
@@ -183,7 +203,24 @@ export default function PortalPage() {
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {paymentLinks.map((item) => {
                 const Icon = item.icon;
-                return (
+                return item.locked ? (
+                  <div
+                    key={item.href}
+                    className="rounded-md border border-dashed border-line/70 bg-surface px-3 py-3 text-muted"
+                    aria-disabled="true"
+                  >
+                    <LockKeyhole className="h-4 w-4 text-muted" />
+                    <div className="mt-2 flex items-center gap-2">
+                      <h2 className="text-sm font-semibold">{item.label}</h2>
+                      <span className="rounded-full bg-line/70 px-2 py-0.5 text-[0.65rem] font-semibold">
+                        Locked
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-muted">
+                      Additional permissions are required.
+                    </p>
+                  </div>
+                ) : (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -213,7 +250,24 @@ export default function PortalPage() {
             <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {websiteLinks.map((item) => {
                 const Icon = item.icon;
-                return (
+                return item.locked ? (
+                  <div
+                    key={item.href}
+                    className="rounded-md border border-dashed border-line/70 bg-surface px-3 py-2.5 text-muted"
+                    aria-disabled="true"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LockKeyhole className="h-4 w-4 text-muted" />
+                      <h2 className="text-sm font-semibold">{item.label}</h2>
+                      <span className="ml-auto rounded-full bg-line/70 px-2 py-0.5 text-[0.65rem] font-semibold">
+                        Locked
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-muted">
+                      Additional permissions are required.
+                    </p>
+                  </div>
+                ) : (
                   <Link
                     key={item.href}
                     href={item.href}

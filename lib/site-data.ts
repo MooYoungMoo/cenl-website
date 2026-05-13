@@ -686,6 +686,7 @@ export type PortalLink = {
   label: string;
   description: string;
   icon: LucideIcon;
+  locked?: boolean;
 };
 
 export type PortalNavigationSection = {

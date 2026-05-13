@@ -5,6 +5,10 @@ import type { ChangeEvent, FormEvent } from "react";
 import { Image as ImageIcon, Plus, Search } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
 import type { SupabaseNewsPost } from "@/lib/news";
+import {
+  canManageWebsiteSection,
+  getEnabledWebsiteSectionsFromRows,
+} from "@/lib/portal-permissions";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -14,6 +18,11 @@ type Profile = {
 type FundingSourceManager = {
   funding_source_id: string;
   user_id: string;
+};
+
+type WebsitePermission = {
+  section: string | null;
+  is_enabled: boolean | null;
 };
 
 type NewsPostRecord = SupabaseNewsPost;
@@ -64,10 +73,6 @@ const newsSelect =
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
-function canManage(role: string | null) {
-  return role === "professor" || role === "admin" || role === "lab_manager";
-}
 
 function slugify(value: string) {
   return value
@@ -256,6 +261,9 @@ async function uploadNewsImageToStorage(
 
 export default function PortalNewsPage() {
   const [role, setRole] = useState<string | null>(null);
+  const [enabledWebsiteSections, setEnabledWebsiteSections] = useState<string[]>(
+    [],
+  );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [, setUserIsProjectAdmin] = useState(false);
   const [newsPosts, setNewsPosts] = useState<NewsPostRecord[]>([]);
@@ -279,7 +287,11 @@ export default function PortalNewsPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageNews = canManage(role);
+  const userCanManageNews = canManageWebsiteSection({
+    role,
+    enabledSections: enabledWebsiteSections,
+    section: "news",
+  });
 
   const loadNewsPosts = useCallback(async () => {
     const { data, error } = await supabase
@@ -317,6 +329,7 @@ export default function PortalNewsPage() {
 
     if (userError || !user) {
       setRole(null);
+      setEnabledWebsiteSections([]);
       setCurrentUserId(null);
       setUserIsProjectAdmin(false);
       setErrorMessage("Please sign in again before managing news.");
@@ -326,9 +339,13 @@ export default function PortalNewsPage() {
 
     setCurrentUserId(user.id);
 
-    const [profileResult, managersResult] = await Promise.all([
+    const [profileResult, managersResult, permissionsResult] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supabase.from("funding_source_managers").select("funding_source_id, user_id"),
+      supabase
+        .from("website_management_permissions")
+        .select("section, is_enabled")
+        .eq("user_id", user.id),
     ]);
 
     if (profileResult.error) {
@@ -342,14 +359,24 @@ export default function PortalNewsPage() {
       ((profileResult.data as Profile | null)?.role ?? null)?.toLowerCase() ??
       null;
     const nextManagers = (managersResult.data ?? []) as FundingSourceManager[];
+    const nextEnabledWebsiteSections = getEnabledWebsiteSectionsFromRows(
+      (permissionsResult.data ?? []) as WebsitePermission[],
+    );
     const hasProjectAdminAccess = nextManagers.some(
       (manager) => manager.user_id === user.id,
     );
 
     setRole(nextRole);
+    setEnabledWebsiteSections(nextEnabledWebsiteSections);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole)) {
+    if (
+      canManageWebsiteSection({
+        role: nextRole,
+        enabledSections: nextEnabledWebsiteSections,
+        section: "news",
+      })
+    ) {
       await loadNewsPosts();
     }
 

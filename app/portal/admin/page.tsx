@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { PortalShell } from "@/components/portal-shell";
 import { logPortalActivity } from "@/lib/portal-activity";
+import {
+  websiteManagementSections,
+  type WebsiteManagementSection,
+} from "@/lib/portal-permissions";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -107,6 +111,18 @@ type ManagedProfileForm = {
   position: string;
 };
 
+type WebsiteSectionPermission = {
+  id?: string;
+  user_id: string;
+  section: WebsiteManagementSection | string;
+  is_enabled: boolean | null;
+  granted_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type WebsitePermissionDraft = Record<WebsiteManagementSection, boolean>;
+
 const emptyFundingForm: FundingSourceForm = {
   name: "",
   fundingAgency: "",
@@ -204,6 +220,38 @@ function parseBudget(value: string) {
   return value.trim() ? Number(value) : 0;
 }
 
+function emptyWebsitePermissionDraft(): WebsitePermissionDraft {
+  return websiteManagementSections.reduce<WebsitePermissionDraft>(
+    (accumulator, item) => {
+      accumulator[item.section] = false;
+      return accumulator;
+    },
+    {} as WebsitePermissionDraft,
+  );
+}
+
+function buildWebsitePermissionDraft(
+  userId: string,
+  permissions: WebsiteSectionPermission[],
+) {
+  const draft = emptyWebsitePermissionDraft();
+
+  permissions
+    .filter((permission) => permission.user_id === userId)
+    .forEach((permission) => {
+      if (
+        websiteManagementSections.some(
+          (item) => item.section === permission.section,
+        )
+      ) {
+        draft[permission.section as WebsiteManagementSection] =
+          permission.is_enabled !== false;
+      }
+    });
+
+  return draft;
+}
+
 export default function AdminPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -228,6 +276,14 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<ManagedProfile[]>([]);
   const [profileDrafts, setProfileDrafts] = useState<
     Record<string, ManagedProfileForm>
+  >({});
+  const [websitePermissions, setWebsitePermissions] = useState<
+    WebsiteSectionPermission[]
+  >([]);
+  const [selectedWebsitePermissionUserId, setSelectedWebsitePermissionUserId] =
+    useState("");
+  const [websitePermissionDrafts, setWebsitePermissionDrafts] = useState<
+    Record<string, WebsitePermissionDraft>
   >({});
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [fundingForm, setFundingForm] =
@@ -258,16 +314,7 @@ export default function AdminPage() {
 
   const userIsGlobalManager = canManage(role);
 
-  const projectManagedFundingSourceIds = useMemo(
-    () =>
-      fundingSourceManagers
-        .filter((manager) => manager.user_id === currentUserId)
-        .map((manager) => manager.funding_source_id),
-    [currentUserId, fundingSourceManagers],
-  );
-
-  const userIsProjectAdmin = projectManagedFundingSourceIds.length > 0;
-  const userCanUseAdmin = userIsGlobalManager || userIsProjectAdmin;
+  const userCanUseAdmin = userIsGlobalManager;
 
   const activeFundingSources = useMemo(
     () => fundingSources.filter((source) => source.is_active !== false),
@@ -349,6 +396,19 @@ export default function AdminPage() {
       }, {}),
     [profiles],
   );
+
+  const selectedWebsitePermissionProfile =
+    profileMap[selectedWebsitePermissionUserId] ?? null;
+  const selectedWebsitePermissionDraft =
+    selectedWebsitePermissionUserId &&
+    websitePermissionDrafts[selectedWebsitePermissionUserId]
+      ? websitePermissionDrafts[selectedWebsitePermissionUserId]
+      : selectedWebsitePermissionUserId
+        ? buildWebsitePermissionDraft(
+            selectedWebsitePermissionUserId,
+            websitePermissions,
+          )
+        : emptyWebsitePermissionDraft();
 
   const mergeSourceMerchant = useMemo(
     () =>
@@ -610,6 +670,9 @@ export default function AdminPage() {
 
     const nextProfiles = (data ?? []) as ManagedProfile[];
     setProfiles(nextProfiles);
+    setSelectedWebsitePermissionUserId(
+      (current) => current || nextProfiles[0]?.id || "",
+    );
     setProfileDrafts(
       nextProfiles.reduce<Record<string, ManagedProfileForm>>(
         (accumulator, profile) => {
@@ -619,6 +682,24 @@ export default function AdminPage() {
         {},
       ),
     );
+  }, []);
+
+  const loadWebsitePermissions = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("website_management_permissions")
+      .select("id, user_id, section, is_enabled, granted_by, created_at, updated_at")
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      setWebsitePermissions([]);
+      setWebsitePermissionDrafts({});
+      setErrorMessage(error.message);
+      return;
+    }
+
+    const nextPermissions = (data ?? []) as WebsiteSectionPermission[];
+    setWebsitePermissions(nextPermissions);
+    setWebsitePermissionDrafts({});
   }, []);
 
   const loadAdminData = useCallback(async () => {
@@ -657,10 +738,7 @@ export default function AdminPage() {
       ((profile as Profile | null)?.role ?? null)?.toLowerCase() ?? null;
     setRole(nextRole);
 
-    const nextManagers = await loadFundingSourceManagers();
-    const hasProjectAdminAccess = nextManagers.some(
-      (manager) => manager.user_id === user.id,
-    );
+    await loadFundingSourceManagers();
 
     if (canManage(nextRole)) {
       await Promise.all([
@@ -668,9 +746,8 @@ export default function AdminPage() {
         loadActivityGroupReviews(),
         loadMerchantReviews(),
         loadProfiles(),
+        loadWebsitePermissions(),
       ]);
-    } else if (hasProjectAdminAccess) {
-      await Promise.all([loadActivityGroupReviews(), loadMerchantReviews()]);
     }
 
     setLoading(false);
@@ -680,6 +757,7 @@ export default function AdminPage() {
     loadActivityGroupReviews,
     loadMerchantReviews,
     loadProfiles,
+    loadWebsitePermissions,
   ]);
 
   useEffect(() => {
@@ -723,6 +801,21 @@ export default function AdminPage() {
       [profileId]: {
         ...current[profileId],
         [field]: value,
+      },
+    }));
+  };
+
+  const updateWebsitePermissionDraft = (
+    profileId: string,
+    section: WebsiteManagementSection,
+    isEnabled: boolean,
+  ) => {
+    setWebsitePermissionDrafts((current) => ({
+      ...current,
+      [profileId]: {
+        ...(current[profileId] ??
+          buildWebsitePermissionDraft(profileId, websitePermissions)),
+        [section]: isEnabled,
       },
     }));
   };
@@ -932,6 +1025,83 @@ export default function AdminPage() {
     );
     setSaving(false);
     await loadProfiles();
+  };
+
+  const handleSaveWebsitePermissions = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!userIsGlobalManager) {
+      setErrorMessage(
+        "You do not have permission to manage Website Section Permissions.",
+      );
+      return;
+    }
+
+    if (!selectedWebsitePermissionUserId) {
+      setErrorMessage("Select a user before saving Website Section Permissions.");
+      return;
+    }
+
+    setSaving(true);
+
+    const now = new Date().toISOString();
+    const draft = selectedWebsitePermissionDraft;
+    const operations = websiteManagementSections.map(async (item) => {
+      const isEnabled = draft[item.section] === true;
+      const existingPermission = websitePermissions.find(
+        (permission) =>
+          permission.user_id === selectedWebsitePermissionUserId &&
+          permission.section === item.section,
+      );
+
+      if (existingPermission) {
+        const { error } = await supabase
+          .from("website_management_permissions")
+          .update({
+            is_enabled: isEnabled,
+            granted_by: isEnabled ? currentUserId : existingPermission.granted_by,
+            updated_at: now,
+          })
+          .eq("id", existingPermission.id);
+
+        if (error) {
+          throw error;
+        }
+
+        return;
+      }
+
+      if (!isEnabled) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from("website_management_permissions")
+        .insert({
+          user_id: selectedWebsitePermissionUserId,
+          section: item.section,
+          is_enabled: true,
+          granted_by: currentUserId,
+          updated_at: now,
+        });
+
+      if (error) {
+        throw error;
+      }
+    });
+
+    try {
+      await Promise.all(operations);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Save failed.");
+      setSaving(false);
+      return;
+    }
+
+    setSuccessMessage("Website Section Permissions updated.");
+    setSaving(false);
+    await loadWebsitePermissions();
   };
 
   const handleUpdateFundingSource = async (sourceId: string) => {
@@ -1905,12 +2075,16 @@ export default function AdminPage() {
             <p>
               <span className="font-semibold text-foreground">student:</span>{" "}
               Can submit purchase requests and manage their own pending
-              requests.
+              requests; may receive specific Website Management permissions.
             </p>
             <p>
               Project-specific admins are assigned under each Funding Source.
               Project admin assignment does not require changing the user role
               to admin.
+            </p>
+            <p>
+              Website Section Permissions control individual public website
+              content pages and are separate from Project Admin payment access.
             </p>
             <p>
               New sign-ups stay pending until approved. If Supabase email
@@ -2085,6 +2259,102 @@ export default function AdminPage() {
           </div>
         </div>
       ) : null}
+    </section>
+  );
+
+  const renderWebsiteSectionPermissions = () => (
+    <section
+      id="website-section-permissions"
+      className="order-2 scroll-mt-28 portal-card rounded-lg border border-line p-6 shadow-panel"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
+            Website Section Permissions
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold">
+            Grant page-specific website access
+          </h3>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
+            These permissions allow selected users to manage only specific
+            public website sections. They do not grant payment, budget, Funding
+            Source, Merchant, Project Admin, or User Management access.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold text-foreground">User</span>
+          <select
+            value={selectedWebsitePermissionUserId}
+            onChange={(event) => {
+              const nextUserId = event.target.value;
+              setSelectedWebsitePermissionUserId(nextUserId);
+              setWebsitePermissionDrafts((current) => ({
+                ...current,
+                [nextUserId]:
+                  current[nextUserId] ??
+                  buildWebsitePermissionDraft(nextUserId, websitePermissions),
+              }));
+            }}
+            className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+          >
+            <option value="">Select user</option>
+            {sortedProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.full_name || profile.email || profile.id.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+          {selectedWebsitePermissionProfile ? (
+            <p className="text-xs leading-5 text-muted">
+              Role: {selectedWebsitePermissionProfile.role ?? "student"}.
+              Section permissions are most useful for student users who should
+              manage selected website pages only.
+            </p>
+          ) : null}
+        </label>
+
+        <div className="rounded-md border border-line bg-white/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+            Sections
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {websiteManagementSections.map((item) => (
+              <label
+                key={item.section}
+                className="flex items-center gap-2 rounded-md border border-line/70 bg-white px-3 py-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedWebsitePermissionDraft[item.section]}
+                  disabled={!selectedWebsitePermissionUserId || saving}
+                  onChange={(event) =>
+                    updateWebsitePermissionDraft(
+                      selectedWebsitePermissionUserId,
+                      item.section,
+                      event.target.checked,
+                    )
+                  }
+                  className="h-4 w-4 accent-brand"
+                />
+                <span className="font-semibold">{item.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              disabled={saving || !selectedWebsitePermissionUserId}
+              onClick={() => void handleSaveWebsitePermissions()}
+              className="rounded-md border border-brand/30 bg-brand-soft px-4 py-2 text-sm font-semibold text-brand transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save Website Permissions"}
+            </button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 
@@ -2400,8 +2670,9 @@ export default function AdminPage() {
       <p className="mt-2 max-w-2xl text-xs leading-6 text-muted">
         profiles.role controls global student/professor/admin/Lab Manager
         access. funding_source_managers controls project-specific admin
-        assignment; do not make student project admins global admins unless they
-        need global access.
+        assignment. website_management_permissions controls section-specific
+        website editing; do not make students global admins unless they need
+        global access.
       </p>
 
       {!loading && userCanUseAdmin ? (
@@ -2426,6 +2697,12 @@ export default function AdminPage() {
                   className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
                 >
                   Project Admins
+                </a>
+                <a
+                  href="#website-section-permissions"
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:bg-brand-soft hover:text-foreground"
+                >
+                  Website Permissions
                 </a>
               </>
             ) : null}
@@ -2472,6 +2749,7 @@ export default function AdminPage() {
       {!loading && userCanUseAdmin ? (
         <div className="mt-8 grid gap-8">
           {userIsGlobalManager ? renderUserManagement() : null}
+          {userIsGlobalManager ? renderWebsiteSectionPermissions() : null}
 
           {userIsGlobalManager ? (
           <section

@@ -10,6 +10,10 @@ import {
   type HomePageContent,
   type SupabaseHomeContent,
 } from "@/lib/home";
+import {
+  canManageWebsiteSection,
+  getEnabledWebsiteSectionsFromRows,
+} from "@/lib/portal-permissions";
 import { supabase } from "@/lib/supabase/client";
 
 type Profile = {
@@ -21,6 +25,11 @@ type FundingSourceManager = {
   user_id: string;
 };
 
+type WebsitePermission = {
+  section: string | null;
+  is_enabled: boolean | null;
+};
+
 type HomeForm = HomePageContent;
 
 const homeSelect =
@@ -28,10 +37,6 @@ const homeSelect =
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
-function canManage(role: string | null) {
-  return role === "professor" || role === "admin" || role === "lab_manager";
-}
 
 function getHomePayload(form: HomeForm, userId: string | null, heroImageUrl?: string | null) {
   const nextHeroImageUrl =
@@ -121,6 +126,9 @@ async function uploadHomeImageToStorage(file: File) {
 
 export default function PortalHomeManagementPage() {
   const [role, setRole] = useState<string | null>(null);
+  const [enabledWebsiteSections, setEnabledWebsiteSections] = useState<string[]>(
+    [],
+  );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [, setUserIsProjectAdmin] = useState(false);
   const [homeForm, setHomeForm] = useState<HomeForm>(fallbackHomeContent);
@@ -132,7 +140,11 @@ export default function PortalHomeManagementPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const userCanManageHome = canManage(role);
+  const userCanManageHome = canManageWebsiteSection({
+    role,
+    enabledSections: enabledWebsiteSections,
+    section: "home",
+  });
 
   const loadHomeContent = useCallback(async () => {
     const { data, error } = await supabase
@@ -165,6 +177,7 @@ export default function PortalHomeManagementPage() {
 
     if (userError || !user) {
       setRole(null);
+      setEnabledWebsiteSections([]);
       setCurrentUserId(null);
       setUserIsProjectAdmin(false);
       setErrorMessage("Please sign in again before managing homepage content.");
@@ -174,9 +187,13 @@ export default function PortalHomeManagementPage() {
 
     setCurrentUserId(user.id);
 
-    const [profileResult, managersResult] = await Promise.all([
+    const [profileResult, managersResult, permissionsResult] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supabase.from("funding_source_managers").select("funding_source_id, user_id"),
+      supabase
+        .from("website_management_permissions")
+        .select("section, is_enabled")
+        .eq("user_id", user.id),
     ]);
 
     if (profileResult.error) {
@@ -190,14 +207,24 @@ export default function PortalHomeManagementPage() {
       ((profileResult.data as Profile | null)?.role ?? null)?.toLowerCase() ??
       null;
     const nextManagers = (managersResult.data ?? []) as FundingSourceManager[];
+    const nextEnabledWebsiteSections = getEnabledWebsiteSectionsFromRows(
+      (permissionsResult.data ?? []) as WebsitePermission[],
+    );
     const hasProjectAdminAccess = nextManagers.some(
       (manager) => manager.user_id === user.id,
     );
 
     setRole(nextRole);
+    setEnabledWebsiteSections(nextEnabledWebsiteSections);
     setUserIsProjectAdmin(hasProjectAdminAccess);
 
-    if (canManage(nextRole)) {
+    if (
+      canManageWebsiteSection({
+        role: nextRole,
+        enabledSections: nextEnabledWebsiteSections,
+        section: "home",
+      })
+    ) {
       await loadHomeContent();
     }
 
