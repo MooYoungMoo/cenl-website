@@ -39,9 +39,24 @@ type SourceStatus = {
   activities: CategoryStatus;
 };
 
+type FundingSourceStatusRpcRow = {
+  funding_source_id: string;
+  funding_source_name: string;
+  currency: string | null;
+  materials_budget: number | null;
+  materials_paid: number | null;
+  materials_pending: number | null;
+  materials_remaining: number | null;
+  activities_budget: number | null;
+  activities_paid: number | null;
+  activities_pending: number | null;
+  activities_remaining: number | null;
+};
+
 type FundingSourceStatusSummaryProps = {
   className?: string;
   emptyMessage?: string;
+  refreshKey?: number;
   restrictToVisibleIds?: boolean;
   visibleFundingSourceIds?: string[] | null;
 };
@@ -125,6 +140,27 @@ function buildCategoryStatus(
   };
 }
 
+function statusFromRpcRow(
+  row: FundingSourceStatusRpcRow,
+  category: CostCategory,
+): CategoryStatus {
+  if (category === "materials") {
+    return {
+      budget: row.materials_budget ?? 0,
+      paid: row.materials_paid ?? 0,
+      pending: row.materials_pending ?? 0,
+      remaining: row.materials_remaining ?? 0,
+    };
+  }
+
+  return {
+    budget: row.activities_budget ?? 0,
+    paid: row.activities_paid ?? 0,
+    pending: row.activities_pending ?? 0,
+    remaining: row.activities_remaining ?? 0,
+  };
+}
+
 function StatusRow({
   label,
   status,
@@ -175,11 +211,13 @@ function StatusRow({
 export function FundingSourceStatusSummary({
   className = "",
   emptyMessage = "No active funding sources are available.",
+  refreshKey = 0,
   restrictToVisibleIds = false,
   visibleFundingSourceIds = null,
 }: FundingSourceStatusSummaryProps) {
   const [sources, setSources] = useState<FundingSource[]>([]);
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [rpcStatuses, setRpcStatuses] = useState<SourceStatus[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -191,6 +229,33 @@ export function FundingSourceStatusSummary({
   const loadSummary = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
+    setRpcStatuses(null);
+
+    if (!restrictToVisibleIds) {
+      const rpcResult = await supabase.rpc("get_funding_source_status_summary");
+
+      if (!rpcResult.error && rpcResult.data) {
+        const nextStatuses = (rpcResult.data as FundingSourceStatusRpcRow[])
+          .slice(0, 5)
+          .map((row) => ({
+            source: {
+              id: row.funding_source_id,
+              name: row.funding_source_name,
+              currency: row.currency,
+              is_active: true,
+              finished_at: null,
+            },
+            materials: statusFromRpcRow(row, "materials"),
+            activities: statusFromRpcRow(row, "activities"),
+          }));
+
+        setRpcStatuses(nextStatuses);
+        setSources([]);
+        setRequests([]);
+        setLoading(false);
+        return;
+      }
+    }
 
     const [sourcesResult, requestsResult] = await Promise.all([
       supabase
@@ -215,7 +280,7 @@ export function FundingSourceStatusSummary({
     }
 
     setLoading(false);
-  }, []);
+  }, [restrictToVisibleIds]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -225,7 +290,7 @@ export function FundingSourceStatusSummary({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [loadSummary]);
+  }, [loadSummary, refreshKey]);
 
   const sourceStatuses = useMemo<SourceStatus[]>(
     () =>
@@ -241,6 +306,14 @@ export function FundingSourceStatusSummary({
           activities: buildCategoryStatus(source, requests, "activities"),
         })),
     [requests, restrictToVisibleIds, sources, visibleIdSet],
+  );
+  const visibleSourceStatuses = useMemo(
+    () =>
+      (rpcStatuses ?? sourceStatuses).filter(
+        (summary) =>
+          !restrictToVisibleIds || visibleIdSet.has(summary.source.id),
+      ),
+    [restrictToVisibleIds, rpcStatuses, sourceStatuses, visibleIdSet],
   );
 
   return (
@@ -269,15 +342,15 @@ export function FundingSourceStatusSummary({
         </div>
       ) : null}
 
-      {!loading && !errorMessage && sourceStatuses.length === 0 ? (
+      {!loading && !errorMessage && visibleSourceStatuses.length === 0 ? (
         <div className="mt-4 rounded-md border border-dashed border-line p-4 text-sm text-muted">
           {emptyMessage}
         </div>
       ) : null}
 
-      {!loading && !errorMessage && sourceStatuses.length > 0 ? (
+      {!loading && !errorMessage && visibleSourceStatuses.length > 0 ? (
         <div className="mt-4 grid gap-3">
-          {sourceStatuses.map((summary) => {
+          {visibleSourceStatuses.map((summary) => {
             const currency = summary.source.currency || "KRW";
 
             return (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { FullImagePreview } from "@/components/full-image-preview";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { fetchVisibleNewsPostBySlug } from "@/lib/news";
 import { newsItems, type NewsItem } from "@/lib/site-data";
@@ -79,12 +80,18 @@ export function NewsDetailContent({ slug }: NewsDetailContentProps) {
         </p>
       </div>
       {item.imageUrl ? (
-        <div
-          className="mt-8 min-h-[260px] rounded-lg bg-cover bg-center sm:min-h-[360px] md:mt-10 md:min-h-[420px]"
-          style={{ backgroundImage: `url(${item.imageUrl})` }}
-          role="img"
-          aria-label={item.representativeImage}
-        />
+        <FullImagePreview
+          src={item.imageUrl}
+          alt={item.representativeImage}
+          className="mt-8 w-full md:mt-10"
+        >
+          <div
+            className="min-h-[260px] rounded-lg bg-cover bg-center sm:min-h-[360px] md:min-h-[420px]"
+            style={{ backgroundImage: `url(${item.imageUrl})` }}
+            role="img"
+            aria-label={item.representativeImage}
+          />
+        </FullImagePreview>
       ) : (
         <VisualPlaceholder
           label={item.representativeImage}
@@ -108,12 +115,14 @@ export function NewsDetailContent({ slug }: NewsDetailContentProps) {
             {item.galleryImages.map((image) => (
               <div key={`${image.label}-${image.url ?? image.caption ?? ""}`}>
                 {image.url ? (
-                  <div
-                    className="min-h-32 rounded-md bg-cover bg-center"
-                    style={{ backgroundImage: `url(${image.url})` }}
-                    role="img"
-                    aria-label={image.label}
-                  />
+                  <FullImagePreview src={image.url} alt={image.label}>
+                    <div
+                      className="min-h-32 rounded-md bg-cover bg-center"
+                      style={{ backgroundImage: `url(${image.url})` }}
+                      role="img"
+                      aria-label={image.label}
+                    />
+                  </FullImagePreview>
                 ) : (
                   <VisualPlaceholder
                     label={image.label}

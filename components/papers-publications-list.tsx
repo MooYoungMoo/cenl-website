@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
+import { FullImagePreview } from "@/components/full-image-preview";
 import {
   ContributionBadge,
   HighlightedAuthors,
@@ -14,12 +15,18 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
     <article className="elevated-card border border-line bg-white p-3 sm:p-4">
       <div className="grid grid-cols-[68px_minmax(0,1fr)] gap-3 sm:grid-cols-[88px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)] lg:grid-cols-[152px_minmax(0,1fr)]">
         {paper.imageUrl ? (
-          <div
-            className="aspect-square w-full rounded-md bg-cover bg-center"
-            style={{ backgroundImage: `url(${paper.imageUrl})` }}
-            role="img"
-            aria-label={paper.imageLabel}
-          />
+          <FullImagePreview
+            src={paper.imageUrl}
+            alt={paper.imageLabel}
+            className="w-full"
+          >
+            <div
+              className="aspect-square w-full rounded-md bg-cover bg-center"
+              style={{ backgroundImage: `url(${paper.imageUrl})` }}
+              role="img"
+              aria-label={paper.imageLabel}
+            />
+          </FullImagePreview>
         ) : (
           <div
             className="flex aspect-square w-full items-center justify-center rounded-md border border-dashed border-line bg-brand-soft text-brand"
@@ -61,9 +68,6 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
           </p>
           <p className="mt-1 text-xs font-semibold text-foreground/75 sm:text-sm">
             {paper.journal} | {paper.year}
-          </p>
-          <p className="mt-2 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-muted sm:text-xs">
-            Citations placeholder ready
           </p>
         </div>
       </div>

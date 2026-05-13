@@ -288,6 +288,7 @@ export function PurchaseRequestPanel() {
   const [cancelingRequestId, setCancelingRequestId] = useState<string | null>(
     null,
   );
+  const [fundingStatusRefreshKey, setFundingStatusRefreshKey] = useState(0);
   const [expandedPaidGroupKeys, setExpandedPaidGroupKeys] = useState<string[]>(
     [],
   );
@@ -1119,6 +1120,7 @@ export function PurchaseRequestPanel() {
     }
 
     setSuccessMessage("Pending purchase request deleted.");
+    setFundingStatusRefreshKey((current) => current + 1);
     setCancelingRequestId(null);
     await loadRequests();
   };
@@ -1248,11 +1250,12 @@ export function PurchaseRequestPanel() {
     setActivityGroupSearch("");
     setSelectedActivityGroup(null);
     setSuccessMessage("Purchase request created as a Pending Payment item.");
+    setFundingStatusRefreshKey((current) => current + 1);
     setSubmitting(false);
     await loadRequests();
   };
 
-  const renderGroupHeader = (group: RequestGroup) => (
+  const renderGroupHeader = (group: RequestGroup, compactName = false) => (
     <span className="flex min-w-0 flex-wrap items-center gap-2">
       <span
         className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
@@ -1268,7 +1271,11 @@ export function PurchaseRequestPanel() {
           {formatActivityType(group.activityType)}
         </span>
       ) : null}
-      <span className="min-w-0 truncate text-lg font-semibold text-foreground">
+      <span
+        className={`min-w-0 truncate font-semibold text-foreground ${
+          compactName ? "text-sm sm:text-base" : "text-lg"
+        }`}
+      >
         {getGroupLabel(group)}
       </span>
     </span>
@@ -1937,7 +1944,7 @@ export function PurchaseRequestPanel() {
                       <span className="text-xs font-semibold text-brand">
                         {expanded ? "v" : ">"}
                       </span>
-                      <div className="min-w-0">{renderGroupHeader(group)}</div>
+                      <div className="min-w-0">{renderGroupHeader(group, true)}</div>
                       <h4 className="hidden">
                         {group.groupType === "activities"
                           ? `${formatActivityType(group.activityType)} · ${group.groupName}`
@@ -2012,6 +2019,7 @@ export function PurchaseRequestPanel() {
       <FundingSourceStatusSummary
         className="mt-10"
         emptyMessage="No active funding sources are available."
+        refreshKey={fundingStatusRefreshKey}
       />
     </div>
   );

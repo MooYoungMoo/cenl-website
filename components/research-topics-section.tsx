@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FullImagePreview } from "@/components/full-image-preview";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { fetchVisibleResearchTopics } from "@/lib/research";
 import { researchTopics, type ResearchTopic } from "@/lib/site-data";
@@ -51,12 +52,14 @@ export function ResearchTopicsSection() {
             >
               <div className={reversed ? "lg:order-2" : ""}>
                 {topic.imageUrl ? (
-                  <div
-                    className="min-h-[240px] rounded-lg bg-cover bg-center sm:min-h-[300px] lg:min-h-[340px]"
-                    style={{ backgroundImage: `url(${topic.imageUrl})` }}
-                    role="img"
-                    aria-label={topic.imageLabel}
-                  />
+                  <FullImagePreview src={topic.imageUrl} alt={topic.imageLabel}>
+                    <div
+                      className="min-h-[240px] rounded-lg bg-cover bg-center sm:min-h-[300px] lg:min-h-[340px]"
+                      style={{ backgroundImage: `url(${topic.imageUrl})` }}
+                      role="img"
+                      aria-label={topic.imageLabel}
+                    />
+                  </FullImagePreview>
                 ) : (
                   <VisualPlaceholder
                     label={topic.imageLabel}

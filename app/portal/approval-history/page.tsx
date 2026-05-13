@@ -327,6 +327,7 @@ export default function PaymentTrackerPage() {
     [],
   );
   const [paidYearFilter, setPaidYearFilter] = useState("all");
+  const [fundingStatusRefreshKey, setFundingStatusRefreshKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -725,6 +726,7 @@ export default function PaymentTrackerPage() {
     });
 
     setSuccessMessage("Selected Pending Payment items were marked as Paid.");
+    setFundingStatusRefreshKey((current) => current + 1);
     setSelectedRequestIds([]);
     setPaymentNote("");
     setSaving(false);
@@ -804,11 +806,12 @@ export default function PaymentTrackerPage() {
     });
 
     setSuccessMessage("Payment was undone and moved back to pending.");
+    setFundingStatusRefreshKey((current) => current + 1);
     setUndoingRequestId(null);
     await loadRequests();
   };
 
-  const renderGroupHeader = (group: RequestGroup) => (
+  const renderGroupHeader = (group: RequestGroup, compactName = false) => (
     <span className="flex min-w-0 flex-wrap items-center gap-2">
       <span
         className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
@@ -824,7 +827,11 @@ export default function PaymentTrackerPage() {
           {formatActivityType(group.activityType)}
         </span>
       ) : null}
-      <span className="min-w-0 truncate text-lg font-semibold text-foreground">
+      <span
+        className={`min-w-0 truncate font-semibold text-foreground ${
+          compactName ? "text-sm sm:text-base" : "text-lg"
+        }`}
+      >
         {getGroupLabel(group)}
       </span>
     </span>
@@ -957,6 +964,7 @@ export default function PaymentTrackerPage() {
         <FundingSourceStatusSummary
           className="mt-8"
           emptyMessage="No active funding sources to summarize."
+          refreshKey={fundingStatusRefreshKey}
           restrictToVisibleIds
           visibleFundingSourceIds={fundingSources.map((source) => source.id)}
         />
@@ -1201,7 +1209,7 @@ export default function PaymentTrackerPage() {
                       {expandedPaidGroupKeys.includes(group.key) ? "v" : ">"}
                       {" "}
                       <span className="inline-flex align-middle">
-                        {renderGroupHeader(group)}
+                        {renderGroupHeader(group, true)}
                       </span>
                     </h4>
                     <h4 className="hidden">

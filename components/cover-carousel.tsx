@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { FullImagePreview } from "@/components/full-image-preview";
 import { VisualPlaceholder } from "@/components/visual-placeholder";
 import { fetchCoverPublications } from "@/lib/publications";
 import type { PublicationItem } from "@/lib/site-data";
@@ -14,12 +15,18 @@ function CoverPublicationCard({
   return (
     <article className="flex min-w-[7.5rem] snap-start flex-col overflow-hidden rounded-md border border-line bg-white shadow-sm sm:min-w-[8.5rem] lg:min-w-[9.5rem]">
       {publication.imageUrl ? (
-        <div
-          className="aspect-[210/297] shrink-0 bg-contain bg-top bg-no-repeat"
-          style={{ backgroundImage: `url(${publication.imageUrl})` }}
-          role="img"
-          aria-label={publication.imageLabel}
-        />
+        <FullImagePreview
+          src={publication.imageUrl}
+          alt={publication.imageLabel}
+          className="shrink-0"
+        >
+          <div
+            className="aspect-[210/297] shrink-0 bg-contain bg-top bg-no-repeat"
+            style={{ backgroundImage: `url(${publication.imageUrl})` }}
+            role="img"
+            aria-label={publication.imageLabel}
+          />
+        </FullImagePreview>
       ) : (
         <VisualPlaceholder
           label="Cover publication placeholder"
