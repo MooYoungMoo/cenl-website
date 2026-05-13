@@ -117,8 +117,9 @@ type WebsiteSectionPermission = {
   section: WebsiteManagementSection | string;
   is_enabled: boolean | null;
   granted_by?: string | null;
-  created_at?: string | null;
+  granted_at?: string | null;
   updated_at?: string | null;
+  note?: string | null;
 };
 
 type WebsitePermissionDraft = Record<WebsiteManagementSection, boolean>;
@@ -252,6 +253,20 @@ function buildWebsitePermissionDraft(
   return draft;
 }
 
+function getWebsiteSectionLabel(section: string | null | undefined) {
+  return (
+    websiteManagementSections.find((item) => item.section === section)?.label ??
+    section ??
+    "Unknown section"
+  );
+}
+
+function isWebsiteManagementSection(
+  section: string | null | undefined,
+): section is WebsiteManagementSection {
+  return websiteManagementSections.some((item) => item.section === section);
+}
+
 export default function AdminPage() {
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -285,6 +300,8 @@ export default function AdminPage() {
   const [websitePermissionDrafts, setWebsitePermissionDrafts] = useState<
     Record<string, WebsitePermissionDraft>
   >({});
+  const [showRevokedWebsitePermissions, setShowRevokedWebsitePermissions] =
+    useState(false);
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [fundingForm, setFundingForm] =
     useState<FundingSourceForm>(emptyFundingForm);
@@ -409,6 +426,67 @@ export default function AdminPage() {
             websitePermissions,
           )
         : emptyWebsitePermissionDraft();
+
+  const currentWebsitePermissionRows = useMemo(() => {
+    const groupedPermissions = websitePermissions.reduce<
+      Record<string, WebsiteSectionPermission[]>
+    >((accumulator, permission) => {
+      if (!isWebsiteManagementSection(permission.section)) {
+        return accumulator;
+      }
+
+      accumulator[permission.user_id] = [
+        ...(accumulator[permission.user_id] ?? []),
+        permission,
+      ];
+      return accumulator;
+    }, {});
+
+    return Object.entries(groupedPermissions)
+      .map(([userId, permissions]) => {
+        const enabledPermissions = permissions.filter(
+          (permission) => permission.is_enabled !== false,
+        );
+        const revokedPermissions = permissions.filter(
+          (permission) => permission.is_enabled === false,
+        );
+        const sortedDates = permissions
+          .flatMap((permission) => [
+            permission.updated_at,
+            permission.granted_at,
+          ])
+          .filter((value): value is string => Boolean(value))
+          .sort((first, second) => Date.parse(second) - Date.parse(first));
+        const sortedGrantedDates = permissions
+          .map((permission) => permission.granted_at)
+          .filter((value): value is string => Boolean(value))
+          .sort((first, second) => Date.parse(second) - Date.parse(first));
+
+        return {
+          userId,
+          profile: profileMap[userId],
+          permissions,
+          enabledPermissions,
+          revokedPermissions,
+          latestTimestamp: sortedDates[0] ?? null,
+          latestGrantedAt: sortedGrantedDates[0] ?? null,
+        };
+      })
+      .filter(
+        (item) =>
+          item.enabledPermissions.length > 0 ||
+          (showRevokedWebsitePermissions &&
+            item.revokedPermissions.length > 0),
+      )
+      .sort((first, second) => {
+        const firstProfileLabel =
+          first.profile?.full_name || first.profile?.email || first.userId;
+        const secondProfileLabel =
+          second.profile?.full_name || second.profile?.email || second.userId;
+
+        return firstProfileLabel.localeCompare(secondProfileLabel);
+      });
+  }, [profileMap, showRevokedWebsitePermissions, websitePermissions]);
 
   const mergeSourceMerchant = useMemo(
     () =>
@@ -687,19 +765,23 @@ export default function AdminPage() {
   const loadWebsitePermissions = useCallback(async () => {
     const { data, error } = await supabase
       .from("website_management_permissions")
-      .select("id, user_id, section, is_enabled, granted_by, created_at, updated_at")
+      .select(
+        "id, user_id, section, is_enabled, granted_by, granted_at, updated_at, note",
+      )
       .order("updated_at", { ascending: false });
 
     if (error) {
+      console.error("Failed to load Website Section Permissions:", error);
       setWebsitePermissions([]);
       setWebsitePermissionDrafts({});
       setErrorMessage(error.message);
-      return;
+      return null;
     }
 
     const nextPermissions = (data ?? []) as WebsiteSectionPermission[];
     setWebsitePermissions(nextPermissions);
     setWebsitePermissionDrafts({});
+    return nextPermissions;
   }, []);
 
   const loadAdminData = useCallback(async () => {
@@ -1056,14 +1138,22 @@ export default function AdminPage() {
       );
 
       if (existingPermission) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from("website_management_permissions")
           .update({
             is_enabled: isEnabled,
-            granted_by: isEnabled ? currentUserId : existingPermission.granted_by,
+            granted_by:
+              existingPermission.granted_by ??
+              (isEnabled ? currentUserId : null),
             updated_at: now,
-          })
-          .eq("id", existingPermission.id);
+          });
+        updateQuery = existingPermission.id
+          ? updateQuery.eq("id", existingPermission.id)
+          : updateQuery
+              .eq("user_id", selectedWebsitePermissionUserId)
+              .eq("section", item.section);
+
+        const { error } = await updateQuery;
 
         if (error) {
           throw error;
@@ -1083,6 +1173,7 @@ export default function AdminPage() {
           section: item.section,
           is_enabled: true,
           granted_by: currentUserId,
+          granted_at: now,
           updated_at: now,
         });
 
@@ -1099,9 +1190,97 @@ export default function AdminPage() {
       return;
     }
 
+    const refreshedPermissions = await loadWebsitePermissions();
+    if (!refreshedPermissions) {
+      setSaving(false);
+      return;
+    }
+
+    setWebsitePermissionDrafts({
+      [selectedWebsitePermissionUserId]: buildWebsitePermissionDraft(
+        selectedWebsitePermissionUserId,
+        refreshedPermissions,
+      ),
+    });
     setSuccessMessage("Website Section Permissions updated.");
     setSaving(false);
-    await loadWebsitePermissions();
+  };
+
+  const handleToggleWebsitePermission = async (
+    permission: WebsiteSectionPermission,
+    isEnabled: boolean,
+  ) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!userIsGlobalManager) {
+      setErrorMessage(
+        "You do not have permission to manage Website Section Permissions.",
+      );
+      return;
+    }
+
+    if (!isWebsiteManagementSection(permission.section)) {
+      setErrorMessage("This Website Section Permission is not recognized.");
+      return;
+    }
+
+    const profile = profileMap[permission.user_id];
+    const sectionLabel = getWebsiteSectionLabel(permission.section);
+    const profileLabel =
+      profile?.full_name || profile?.email || permission.user_id.slice(0, 8);
+    const action = isEnabled ? "restore" : "revoke";
+
+    if (
+      !window.confirm(
+        `Are you sure you want to ${action} ${sectionLabel} access for ${profileLabel}?`,
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+
+    const now = new Date().toISOString();
+    let updateQuery = supabase
+      .from("website_management_permissions")
+      .update({
+        is_enabled: isEnabled,
+        updated_at: now,
+      });
+    updateQuery = permission.id
+      ? updateQuery.eq("id", permission.id)
+      : updateQuery
+          .eq("user_id", permission.user_id)
+          .eq("section", permission.section);
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    const refreshedPermissions = await loadWebsitePermissions();
+    if (!refreshedPermissions) {
+      setSaving(false);
+      return;
+    }
+
+    setWebsitePermissionDrafts((current) => ({
+      ...current,
+      [permission.user_id]: buildWebsitePermissionDraft(
+        permission.user_id,
+        refreshedPermissions,
+      ),
+    }));
+    setSuccessMessage(
+      isEnabled
+        ? "Website Section Permission restored."
+        : "Website Section Permission revoked.",
+    );
+    setSaving(false);
   };
 
   const handleUpdateFundingSource = async (sourceId: string) => {
@@ -2276,11 +2455,149 @@ export default function AdminPage() {
             Grant page-specific website access
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
-            These permissions allow selected users to manage only specific
-            public website sections. They do not grant payment, budget, Funding
-            Source, Merchant, Project Admin, or User Management access.
+            Enabled sections grant access only to those Website Management
+            pages. They do not grant Payment Tracker, Budget Dashboard, Funding
+            Source, Merchant, User Management, or Admin access.
           </p>
         </div>
+      </div>
+
+      <div className="mt-5 rounded-md border border-line bg-white/60 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              Current Website Permissions
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Enabled badges are active page permissions. Revoked permissions
+              stay disabled for history and can be restored.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-muted">
+            <input
+              type="checkbox"
+              checked={showRevokedWebsitePermissions}
+              onChange={(event) =>
+                setShowRevokedWebsitePermissions(event.target.checked)
+              }
+              className="h-3.5 w-3.5 accent-brand"
+            />
+            Show revoked permissions
+          </label>
+        </div>
+
+        {currentWebsitePermissionRows.length === 0 ? (
+          <p className="mt-3 rounded-md border border-dashed border-line bg-white px-3 py-4 text-sm text-muted">
+            No Website Section Permissions are currently assigned.
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-2">
+            {currentWebsitePermissionRows.map((item) => {
+              const profile = item.profile;
+              const profileName =
+                profile?.full_name ||
+                profile?.email ||
+                `User ${item.userId.slice(0, 8)}`;
+              const profileEmail = profile?.email ?? "No email on profile";
+              const isLabManager = profile?.role === "lab_manager";
+
+              return (
+                <article
+                  key={item.userId}
+                  className="rounded-md border border-line bg-white px-3 py-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {profileName}
+                        </p>
+                        {isLabManager ? (
+                          <span className="rounded-full border border-brand/20 bg-brand-soft px-2 py-0.5 text-[0.68rem] font-semibold text-brand">
+                            Full Website Management via Lab Manager role
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted">
+                        {profileEmail}
+                      </p>
+                    </div>
+                    <div className="text-left text-[0.68rem] leading-5 text-muted sm:text-right">
+                      <p>Granted: {formatDate(item.latestGrantedAt)}</p>
+                      <p>Updated: {formatDate(item.latestTimestamp)}</p>
+                    </div>
+                  </div>
+
+                  {item.enabledPermissions.length === 0 ? (
+                    <p className="mt-3 text-xs text-muted">
+                      No enabled section permissions.
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.enabledPermissions.map((permission) => (
+                        <span
+                          key={`${permission.id ?? permission.section}-enabled`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-2 py-1 text-xs font-semibold text-brand"
+                        >
+                          {getWebsiteSectionLabel(permission.section)}
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              void handleToggleWebsitePermission(
+                                permission,
+                                false,
+                              )
+                            }
+                            className="rounded-full px-1 text-[0.68rem] font-bold text-brand transition hover:bg-white disabled:opacity-50"
+                            aria-label={`Revoke ${getWebsiteSectionLabel(
+                              permission.section,
+                            )} access`}
+                          >
+                            Revoke
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {showRevokedWebsitePermissions &&
+                  item.revokedPermissions.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                      {item.revokedPermissions.map((permission) => (
+                        <span
+                          key={`${permission.id ?? permission.section}-revoked`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-slate-50 px-2 py-1 text-xs font-semibold text-muted"
+                        >
+                          {getWebsiteSectionLabel(permission.section)}
+                          <span className="text-[0.66rem] font-medium">
+                            revoked
+                          </span>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              void handleToggleWebsitePermission(
+                                permission,
+                                true,
+                              )
+                            }
+                            className="rounded-full px-1 text-[0.68rem] font-bold text-brand transition hover:bg-white disabled:opacity-50"
+                            aria-label={`Restore ${getWebsiteSectionLabel(
+                              permission.section,
+                            )} access`}
+                          >
+                            Restore
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
@@ -2291,12 +2608,16 @@ export default function AdminPage() {
             onChange={(event) => {
               const nextUserId = event.target.value;
               setSelectedWebsitePermissionUserId(nextUserId);
-              setWebsitePermissionDrafts((current) => ({
-                ...current,
-                [nextUserId]:
-                  current[nextUserId] ??
-                  buildWebsitePermissionDraft(nextUserId, websitePermissions),
-              }));
+              setWebsitePermissionDrafts(
+                nextUserId
+                  ? {
+                      [nextUserId]: buildWebsitePermissionDraft(
+                        nextUserId,
+                        websitePermissions,
+                      ),
+                    }
+                  : {},
+              );
             }}
             className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
           >
