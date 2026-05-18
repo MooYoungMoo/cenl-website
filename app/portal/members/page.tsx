@@ -30,11 +30,16 @@ type MemberRecord = SupabaseLabMember;
 type MemberForm = {
   name: string;
   memberType: "current" | "alumni";
-  role: string;
   degreeProgram: string;
+  isLabManager: boolean;
+  education: string;
+  research: string;
+  selectedPublications: string;
   email: string;
   biography: string;
   currentAffiliation: string;
+  currentPosition: string;
+  alumniCategory: string;
   photoUrl: string;
   displayOrder: string;
   isVisible: boolean;
@@ -43,18 +48,23 @@ type MemberForm = {
 const emptyMemberForm: MemberForm = {
   name: "",
   memberType: "current",
-  role: "",
   degreeProgram: "",
+  isLabManager: false,
+  education: "",
+  research: "",
+  selectedPublications: "",
   email: "",
   biography: "",
   currentAffiliation: "",
+  currentPosition: "",
+  alumniCategory: "",
   photoUrl: "",
   displayOrder: "0",
   isVisible: true,
 };
 
 const memberSelect =
-  "id, name, member_type, role, degree_program, email, biography, current_affiliation, photo_url, display_order, is_visible, created_by, created_at, updated_at";
+  "id, name, member_type, role, degree_program, email, biography, current_affiliation, is_lab_manager, education, research, selected_publications, current_position, alumni_category, photo_url, display_order, is_visible, created_by, created_at, updated_at";
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -63,11 +73,16 @@ function toMemberForm(member: MemberRecord): MemberForm {
   return {
     name: member.name ?? "",
     memberType: member.member_type === "alumni" ? "alumni" : "current",
-    role: member.role ?? "",
     degreeProgram: member.degree_program ?? "",
+    isLabManager: member.is_lab_manager === true,
+    education: member.education ?? "",
+    research: member.research ?? "",
+    selectedPublications: member.selected_publications ?? "",
     email: member.email ?? "",
     biography: member.biography ?? "",
     currentAffiliation: member.current_affiliation ?? "",
+    currentPosition: member.current_position ?? "",
+    alumniCategory: member.alumni_category ?? "",
     photoUrl: member.photo_url ?? "",
     displayOrder: String(member.display_order ?? 0),
     isVisible: member.is_visible !== false,
@@ -85,11 +100,16 @@ function getMemberPayload(form: MemberForm, photoUrlOverride?: string | null) {
   return {
     name: form.name.trim(),
     member_type: form.memberType,
-    role: form.role.trim() || null,
     degree_program: form.degreeProgram.trim() || null,
+    is_lab_manager: form.isLabManager,
+    education: form.education.trim() || null,
+    research: form.research.trim() || null,
+    selected_publications: form.selectedPublications.trim() || null,
     email: form.email.trim() || null,
     biography: form.biography.trim() || null,
     current_affiliation: form.currentAffiliation.trim() || null,
+    current_position: form.currentPosition.trim() || null,
+    alumni_category: form.alumniCategory.trim() || null,
     photo_url: nextPhotoUrl,
     display_order: parseDisplayOrder(form.displayOrder),
     is_visible: form.isVisible,
@@ -349,10 +369,14 @@ export default function PortalMembersPage() {
 
         return [
           member.name,
-          member.role,
           member.email,
           member.biography,
           member.current_affiliation,
+          member.education,
+          member.research,
+          member.selected_publications,
+          member.current_position,
+          member.alumni_category,
         ]
           .join(" ")
           .toLowerCase()
@@ -655,18 +679,27 @@ export default function PortalMembersPage() {
         className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
         placeholder="Display order"
       />
-      <input
-        value={form.role}
-        onChange={(event) => onChange("role", event.target.value)}
-        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
-        placeholder="Role"
-      />
-      <input
-        value={form.degreeProgram}
-        onChange={(event) => onChange("degreeProgram", event.target.value)}
-        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
-        placeholder="Degree / Program"
-      />
+      <label className="grid gap-1">
+        <input
+          value={form.degreeProgram}
+          onChange={(event) => onChange("degreeProgram", event.target.value)}
+          className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+          placeholder="Degree / Program"
+        />
+        <span className="text-xs leading-5 text-muted">
+          Current status in the lab, e.g. M.S. Candidate, Undergraduate Intern,
+          Postdoctoral Associate.
+        </span>
+      </label>
+      <label className="flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-muted">
+        <input
+          type="checkbox"
+          checked={form.isLabManager}
+          onChange={(event) => onChange("isLabManager", event.target.checked)}
+          className="h-4 w-4 rounded border-line"
+        />
+        Lab Manager
+      </label>
       <input
         value={form.email}
         onChange={(event) => onChange("email", event.target.value)}
@@ -680,16 +713,69 @@ export default function PortalMembersPage() {
         placeholder="Current affiliation"
       />
       <input
+        value={form.currentPosition}
+        onChange={(event) => onChange("currentPosition", event.target.value)}
+        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+        placeholder="Current position / workplace"
+      />
+      <select
+        value={form.alumniCategory}
+        onChange={(event) => onChange("alumniCategory", event.target.value)}
+        className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+      >
+        <option value="">Alumni category</option>
+        <option value="graduate_student">Graduate student</option>
+        <option value="postdoc">Postdoc</option>
+        <option value="undergraduate_intern">Undergraduate Intern</option>
+      </select>
+      <input
         value={form.photoUrl}
         onChange={(event) => onChange("photoUrl", event.target.value)}
         className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-2"
         placeholder="Manual photo URL, optional"
       />
+      <label className="grid gap-1 lg:col-span-2">
+        <textarea
+          value={form.education}
+          onChange={(event) => onChange("education", event.target.value)}
+          className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+          placeholder="Education"
+        />
+        <span className="text-xs leading-5 text-muted">
+          Previous degrees/institutions. Use one line per degree, e.g. Ph.D.,
+          IIT Jammu, 2025.
+        </span>
+      </label>
+      <label className="grid gap-1 lg:col-span-2">
+        <textarea
+          value={form.research}
+          onChange={(event) => onChange("research", event.target.value)}
+          className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+          placeholder="Research"
+        />
+        <span className="text-xs leading-5 text-muted">
+          Current research topic or project focus.
+        </span>
+      </label>
+      <label className="grid gap-1 lg:col-span-2">
+        <textarea
+          value={form.selectedPublications}
+          onChange={(event) =>
+            onChange("selectedPublications", event.target.value)
+          }
+          className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand"
+          placeholder={"Selected Publications / Publication Records\nACS Sensors, 2026\nAdvanced Functional Materials, 2025"}
+        />
+        <span className="text-xs leading-5 text-muted">
+          Short publication records. Use one line per publication, e.g. ACS
+          Sensors, 2026.
+        </span>
+      </label>
       <textarea
         value={form.biography}
         onChange={(event) => onChange("biography", event.target.value)}
-        className="min-h-24 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-4"
-        placeholder="Biography"
+        className="min-h-20 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-brand lg:col-span-2"
+        placeholder="Biography, optional"
       />
       <div className="rounded-md border border-line bg-white/70 p-3 text-sm lg:col-span-2">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
@@ -737,6 +823,12 @@ export default function PortalMembersPage() {
           {photoFile ? ` Selected: ${photoFile.name}` : ""}
         </span>
       </label>
+      {form.memberType === "alumni" ? (
+        <p className="text-xs leading-5 text-muted lg:col-span-4">
+          Alumni photos stay available here, but the public Alumni page shows
+          them only by click-to-preview to keep the list compact.
+        </p>
+      ) : null}
       <label className="flex items-center gap-2 text-sm font-medium text-muted">
         <input
           type="checkbox"
@@ -855,7 +947,7 @@ export default function PortalMembersPage() {
                     setPage(1);
                   }}
                   className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand"
-                  placeholder="Search name, role, email, biography, or affiliation"
+                  placeholder="Search name, email, education, research, publication records, or position"
                 />
               </label>
               <select
@@ -907,11 +999,11 @@ export default function PortalMembersPage() {
             {filteredMembers.length > 0 ? (
               <div className="mt-5 overflow-x-auto rounded-md border border-line bg-white/60">
                 <div className="min-w-[1120px] divide-y divide-line">
-                  <div className="grid grid-cols-[80px_180px_90px_150px_170px_180px_80px_70px_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                  <div className="grid grid-cols-[80px_180px_90px_110px_170px_180px_80px_70px_auto] gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                     <span>Photo</span>
                     <span>Name</span>
                     <span>Type</span>
-                    <span>Role</span>
+                    <span>Lab Manager</span>
                     <span>Degree/Program</span>
                     <span>Email</span>
                     <span>Visible</span>
@@ -924,12 +1016,12 @@ export default function PortalMembersPage() {
 
                     return (
                       <div key={member.id} className="divide-y divide-line">
-                        <div className="grid grid-cols-[80px_180px_90px_150px_170px_180px_80px_70px_auto] gap-3 px-3 py-3 text-sm">
+                        <div className="grid grid-cols-[80px_180px_90px_110px_170px_180px_80px_70px_auto] gap-3 px-3 py-3 text-sm">
                           <div>{thumbnail(member)}</div>
                           <p className="font-semibold">{member.name}</p>
                           <p className="text-sm text-muted">{member.member_type}</p>
-                          <p className="line-clamp-2 text-sm text-muted">
-                            {member.role ?? "TBD"}
+                          <p className="text-sm text-muted">
+                            {member.is_lab_manager === true ? "Yes" : "No"}
                           </p>
                           <p className="line-clamp-2 text-sm text-muted">
                             {member.degree_program ?? "TBD"}

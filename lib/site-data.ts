@@ -67,6 +67,10 @@ export type LabMember = {
   name: string;
   role?: string;
   degree: string;
+  education?: string;
+  research?: string;
+  selectedPublications?: string;
+  isLabManager?: boolean;
   biography: string;
   email: string;
   photoUrl?: string;
@@ -77,6 +81,8 @@ export type AlumniProfile = {
   name: string;
   role: string;
   affiliation: string;
+  currentPosition?: string;
+  alumniCategory?: string;
   contact: string;
   biography?: string;
   photoUrl?: string;

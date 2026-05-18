@@ -10,6 +10,12 @@ export type SupabaseLabMember = {
   email: string | null;
   biography: string | null;
   current_affiliation: string | null;
+  is_lab_manager: boolean | null;
+  education: string | null;
+  research: string | null;
+  selected_publications: string | null;
+  current_position: string | null;
+  alumni_category: string | null;
   photo_url: string | null;
   display_order: number | null;
   is_visible: boolean | null;
@@ -19,14 +25,18 @@ export type SupabaseLabMember = {
 };
 
 const memberSelect =
-  "id, name, member_type, role, degree_program, email, biography, current_affiliation, photo_url, display_order, is_visible, created_by, created_at, updated_at";
+  "id, name, member_type, role, degree_program, email, biography, current_affiliation, is_lab_manager, education, research, selected_publications, current_position, alumni_category, photo_url, display_order, is_visible, created_by, created_at, updated_at";
 
 export function mapCurrentMember(member: SupabaseLabMember): LabMember {
   return {
     id: member.id,
     name: member.name,
     role: member.role ?? undefined,
-    degree: member.degree_program || member.role || "Lab Member",
+    degree: member.degree_program || "Lab Member",
+    education: member.education?.trim() || member.degree_program || "",
+    research: member.research?.trim() || member.biography || "",
+    selectedPublications: member.selected_publications?.trim() || "",
+    isLabManager: member.is_lab_manager === true,
     biography: member.biography ?? "",
     email: member.email ?? "TBD",
     photoUrl: member.photo_url ?? undefined,
@@ -39,6 +49,9 @@ export function mapAlumniMember(member: SupabaseLabMember): AlumniProfile {
     name: member.name,
     role: member.role || member.degree_program || "Alumni",
     affiliation: member.current_affiliation || "TBD",
+    currentPosition:
+      member.current_position?.trim() || member.current_affiliation || "",
+    alumniCategory: member.alumni_category?.trim() || "",
     contact: member.email ?? "Optional contact placeholder",
     biography: member.biography ?? undefined,
     photoUrl: member.photo_url ?? undefined,

@@ -1,10 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail } from "lucide-react";
-import { VisualPlaceholder } from "@/components/visual-placeholder";
+import { ImageIcon } from "lucide-react";
+import { FullImagePreview } from "@/components/full-image-preview";
 import { fetchAlumniMembers } from "@/lib/members";
 import { alumni, type AlumniProfile } from "@/lib/site-data";
+
+type AlumniGroupKey =
+  | "graduate_student"
+  | "postdoc"
+  | "undergraduate_intern"
+  | "other";
+
+const alumniGroups: { key: AlumniGroupKey; label: string }[] = [
+  { key: "graduate_student", label: "Graduate Students" },
+  { key: "postdoc", label: "Postdocs" },
+  { key: "undergraduate_intern", label: "Undergraduate Interns" },
+  { key: "other", label: "Other Alumni" },
+];
+
+function getAlumniGroup(member: AlumniProfile): AlumniGroupKey {
+  if (
+    member.alumniCategory === "graduate_student" ||
+    member.alumniCategory === "postdoc" ||
+    member.alumniCategory === "undergraduate_intern"
+  ) {
+    return member.alumniCategory;
+  }
+
+  const role = member.role.toLowerCase();
+
+  if (role.includes("postdoc")) {
+    return "postdoc";
+  }
+
+  if (role.includes("undergraduate")) {
+    return "undergraduate_intern";
+  }
+
+  if (role.includes("m.s.") || role.includes("ph.d.")) {
+    return "graduate_student";
+  }
+
+  return "other";
+}
 
 export function AlumniSection() {
   const [items, setItems] = useState<AlumniProfile[]>(alumni);
@@ -33,6 +72,11 @@ export function AlumniSection() {
     };
   }, []);
 
+  const groupedItems = alumniGroups.map((group) => ({
+    ...group,
+    members: items.filter((member) => getAlumniGroup(member) === group.key),
+  }));
+
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6">
       {items.length === 0 ? (
@@ -40,55 +84,54 @@ export function AlumniSection() {
           No alumni profiles are available yet.
         </div>
       ) : null}
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {items.map((member) => (
-          <article
-            key={member.id}
-            className="elevated-card overflow-hidden border border-line bg-white"
-          >
-            {member.photoUrl ? (
-              <div
-                className="min-h-48 rounded-none bg-cover bg-center sm:min-h-52"
-                style={{ backgroundImage: `url(${member.photoUrl})` }}
-                role="img"
-                aria-label={`${member.name} alumni photo`}
-              />
-            ) : (
-              <VisualPlaceholder
-                label="Alumni photo placeholder"
-                className="min-h-52 rounded-none"
-              />
-            )}
-            <div className="min-w-0 p-5 sm:p-6">
-              <h2 className="break-words text-xl font-semibold">{member.name}</h2>
-              <p className="mt-2 break-words text-sm font-medium text-brand">
-                {member.role}
-              </p>
-              <p className="mt-4 break-words text-sm leading-7 text-muted">
-                {member.affiliation}
-              </p>
-              {member.biography ? (
-                <p className="mt-3 break-words text-sm leading-7 text-muted">
-                  {member.biography}
-                </p>
-              ) : null}
-              {member.contact.includes("@") ? (
-                <a
-                  href={`mailto:${member.contact}`}
-                  className="mt-5 inline-flex max-w-full items-center gap-2 break-all text-sm font-medium text-brand"
-                >
-                  <Mail className="h-4 w-4" />
-                  {member.contact}
-                </a>
-              ) : (
-                <p className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand">
-                  <Mail className="h-4 w-4" />
-                  {member.contact}
-                </p>
-              )}
-            </div>
-          </article>
-        ))}
+
+      <div className="space-y-5">
+        {groupedItems.map((group) =>
+          group.members.length > 0 ? (
+            <section
+              key={group.key}
+              className="rounded-lg border border-line bg-white/80 p-4 shadow-sm"
+            >
+              <h2 className="text-lg font-semibold">{group.label}</h2>
+              <div className="mt-3 divide-y divide-line">
+                {group.members.map((member) => (
+                  <article
+                    key={member.id}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-semibold">
+                        {member.name}
+                      </h3>
+                      <p className="mt-1 truncate text-sm text-muted">
+                        {member.currentPosition || member.affiliation}
+                      </p>
+                    </div>
+                    {member.photoUrl ? (
+                      <FullImagePreview
+                        src={member.photoUrl}
+                        alt={`${member.name} alumni photo`}
+                      >
+                        <div
+                          className="h-12 w-9 shrink-0 rounded-md border border-line bg-cover bg-top"
+                          style={{
+                            backgroundImage: `url(${member.photoUrl})`,
+                          }}
+                          role="img"
+                          aria-label={`${member.name} alumni photo preview`}
+                        />
+                      </FullImagePreview>
+                    ) : (
+                      <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded-md border border-dashed border-line text-muted">
+                        <ImageIcon className="h-4 w-4" />
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null,
+        )}
       </div>
     </section>
   );
