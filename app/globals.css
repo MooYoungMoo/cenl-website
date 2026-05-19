@@ -33,7 +33,7 @@ body {
     radial-gradient(circle at 12% 18%, rgba(14, 165, 233, 0.12) 0 2px, transparent 2.5px),
     radial-gradient(circle at 34% 32%, rgba(37, 99, 235, 0.08) 0 1.5px, transparent 2px),
     radial-gradient(circle at 72% 20%, rgba(8, 145, 178, 0.1) 0 2px, transparent 2.5px),
-    linear-gradient(115deg, transparent 0 48%, rgba(14, 165, 233, 0.06) 48% 49%, transparent 49%),
+    linear-gradient(115deg, transparent 0 48%, rgba(14, 165, 233, 0.035) 48% 49%, transparent 49%),
     linear-gradient(135deg, rgba(14, 116, 180, 0.09), transparent 34%),
     linear-gradient(225deg, rgba(37, 99, 235, 0.07), transparent 30%),
     var(--background);
@@ -93,6 +93,41 @@ h6 {
 
 ::selection {
   background: rgba(14, 165, 233, 0.2);
+}
+
+.page-hero-copy {
+  position: relative;
+  isolation: isolate;
+  max-width: 64rem;
+}
+
+.page-hero-copy::before {
+  position: absolute;
+  z-index: -1;
+  inset: -1.25rem -1.75rem;
+  content: "";
+  border-radius: 2rem;
+  background: linear-gradient(
+    90deg,
+    rgba(245, 249, 255, 0.96),
+    rgba(245, 249, 255, 0.82) 68%,
+    rgba(245, 249, 255, 0)
+  );
+  backdrop-filter: blur(1px);
+  box-shadow: 0 20px 60px rgba(245, 249, 255, 0.34);
+}
+
+@media (max-width: 640px) {
+  .page-hero-copy::before {
+    inset: -1rem -0.75rem;
+    border-radius: 1.35rem;
+    background: linear-gradient(
+      90deg,
+      rgba(245, 249, 255, 0.98),
+      rgba(245, 249, 255, 0.9) 78%,
+      rgba(245, 249, 255, 0.28)
+    );
+  }
 }
 
 @theme inline {
