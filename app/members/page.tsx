@@ -15,8 +15,8 @@ export default function MembersPage() {
     <div className="pb-16">
       <PageHero
         eyebrow="Members"
-        title="People behind CENL's materials and sensing research"
-        description="The members area is split into a PI detail page and a lab member directory so the structure can scale cleanly."
+        title="People"
+        description="Meet the members of CENL."
       />
       <section className="mx-auto grid max-w-6xl gap-6 px-6 md:grid-cols-3">
         {memberSections.map((section) => {

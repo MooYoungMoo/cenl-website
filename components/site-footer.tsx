@@ -2,35 +2,56 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { contactDetails, navigation } from "@/lib/site-data";
+import {
+  fallbackContactContent,
+  fetchContactContent,
+  type ContactPageContent,
+} from "@/lib/contact";
+import { navigation } from "@/lib/site-data";
 import {
   fallbackSiteSettings,
   fetchSiteSettings,
   type SiteSettingsContent,
 } from "@/lib/site-settings";
 
+function isVisibleContactValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  return Boolean(normalized) && normalized !== "tbd";
+}
+
 export function SiteFooter() {
   const [settings, setSettings] =
     useState<SiteSettingsContent>(fallbackSiteSettings);
+  const [contact, setContact] =
+    useState<ContactPageContent>(fallbackContactContent);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadSettings = async () => {
-      try {
-        const nextSettings = await fetchSiteSettings();
+    const loadFooterData = async () => {
+      const [settingsResult, contactResult] = await Promise.allSettled([
+        fetchSiteSettings(),
+        fetchContactContent(),
+      ]);
 
-        if (mounted && nextSettings) {
-          setSettings(nextSettings);
-        }
-      } catch {
-        if (mounted) {
-          setSettings(fallbackSiteSettings);
-        }
+      if (!mounted) {
+        return;
       }
+
+      setSettings(
+        settingsResult.status === "fulfilled" && settingsResult.value
+          ? settingsResult.value
+          : fallbackSiteSettings,
+      );
+      setContact(
+        contactResult.status === "fulfilled" && contactResult.value
+          ? contactResult.value
+          : fallbackContactContent,
+      );
     };
 
-    void loadSettings();
+    void loadFooterData();
 
     return () => {
       mounted = false;
@@ -66,10 +87,36 @@ export function SiteFooter() {
             Contact
           </p>
           <div className="grid gap-1 text-sm leading-7 text-muted">
-            <p>{contactDetails.lab}</p>
-            <p>Contact person: {contactDetails.contactPerson}</p>
-            <p>Role: {contactDetails.role}</p>
-            <p>Email: {contactDetails.emails[0]}</p>
+            {isVisibleContactValue(contact.labName) ? (
+              <p>{contact.labName}</p>
+            ) : null}
+            {isVisibleContactValue(contact.contactPerson) ? (
+              <p>Contact person: {contact.contactPerson}</p>
+            ) : null}
+            {isVisibleContactValue(contact.contactRole) ? (
+              <p>Role: {contact.contactRole}</p>
+            ) : null}
+            {isVisibleContactValue(contact.contactEmail) ? (
+              <a
+                href={`mailto:${contact.contactEmail}`}
+                className="w-fit break-all text-brand transition hover:text-foreground"
+              >
+                {contact.contactEmail}
+              </a>
+            ) : null}
+            {isVisibleContactValue(contact.address) ? (
+              <p>{contact.address}</p>
+            ) : null}
+            {isVisibleContactValue(contact.mapUrl) ? (
+              <a
+                href={contact.mapUrl.trim()}
+                target="_blank"
+                rel="noreferrer"
+                className="w-fit text-brand transition hover:text-foreground"
+              >
+                Open campus map
+              </a>
+            ) : null}
           </div>
         </div>
       </div>
