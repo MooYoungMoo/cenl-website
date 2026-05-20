@@ -7,6 +7,7 @@ import { PortalShell } from "@/components/portal-shell";
 import {
   fallbackHomeContent,
   mapHomeContent,
+  type HomeHeroGalleryImage,
   type HomePageContent,
   type SupabaseHomeContent,
 } from "@/lib/home";
@@ -31,16 +32,25 @@ type WebsitePermission = {
 };
 
 type HomeForm = HomePageContent;
+type HomeTextField = Exclude<keyof HomeForm, "heroGalleryImages">;
 
 const homeSelect =
-  "id, hero_title, hero_subtitle, hero_description, primary_button_label, primary_button_href, secondary_button_label, secondary_button_href, research_highlight_title, research_highlight_description, latest_publications_title, latest_news_title, hero_image_url, updated_by, created_at, updated_at";
+  "id, hero_title, hero_subtitle, hero_description, primary_button_label, primary_button_href, secondary_button_label, secondary_button_href, research_highlight_title, research_highlight_description, latest_publications_title, latest_news_title, hero_image_url, hero_gallery_images, updated_by, created_at, updated_at";
 
 const maxImageSize = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+const maxHeroGalleryImages = 5;
 
 function getHomePayload(form: HomeForm, userId: string | null, heroImageUrl?: string | null) {
   const nextHeroImageUrl =
     heroImageUrl !== undefined ? heroImageUrl : form.heroImageUrl.trim() || null;
+  const heroGalleryImages = form.heroGalleryImages
+    .filter((image) => image.url.trim())
+    .slice(0, maxHeroGalleryImages)
+    .map((image, index) => ({
+      url: image.url.trim(),
+      alt: image.alt.trim() || `CENL hero photo ${index + 1}`,
+    }));
 
   return {
     id: "main",
@@ -56,6 +66,7 @@ function getHomePayload(form: HomeForm, userId: string | null, heroImageUrl?: st
     latest_publications_title: form.latestPublicationsTitle.trim(),
     latest_news_title: form.latestNewsTitle.trim(),
     hero_image_url: nextHeroImageUrl,
+    hero_gallery_images: heroGalleryImages,
     updated_by: userId,
   };
 }
@@ -133,6 +144,7 @@ export default function PortalHomeManagementPage() {
   const [, setUserIsProjectAdmin] = useState(false);
   const [homeForm, setHomeForm] = useState<HomeForm>(fallbackHomeContent);
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
+  const [heroGalleryFiles, setHeroGalleryFiles] = useState<File[]>([]);
   const [heroImageCleared, setHeroImageCleared] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -241,12 +253,21 @@ export default function PortalHomeManagementPage() {
     };
   }, [loadAccess]);
 
-  const updateHomeForm = (field: keyof HomeForm, value: string) => {
+  const updateHomeForm = (field: HomeTextField, value: string) => {
     setHomeForm((current) => ({ ...current, [field]: value }));
 
     if (field === "heroImageUrl" && value.trim()) {
       setHeroImageCleared(false);
     }
+  };
+
+  const removeHeroGalleryImage = (indexToRemove: number) => {
+    setHomeForm((current) => ({
+      ...current,
+      heroGalleryImages: current.heroGalleryImages.filter(
+        (_, index) => index !== indexToRemove,
+      ),
+    }));
   };
 
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -268,6 +289,46 @@ export default function PortalHomeManagementPage() {
     }
 
     setHeroImageFile(file);
+  };
+
+  const handleGalleryFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage("");
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (selectedFiles.length === 0) {
+      setHeroGalleryFiles([]);
+      return;
+    }
+
+    const availableSlots =
+      maxHeroGalleryImages -
+      homeForm.heroGalleryImages.length -
+      heroGalleryFiles.length;
+
+    if (availableSlots <= 0 || selectedFiles.length > availableSlots) {
+      setErrorMessage(
+        `Home hero gallery supports up to ${maxHeroGalleryImages} photos. Remove a photo before adding more.`,
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const invalidFile = selectedFiles.find((file) => validateImageFile(file));
+
+    if (invalidFile) {
+      setErrorMessage(validateImageFile(invalidFile));
+      event.target.value = "";
+      return;
+    }
+
+    setHeroGalleryFiles((current) => [...current, ...selectedFiles]);
+    event.target.value = "";
+  };
+
+  const removeSelectedGalleryFile = (indexToRemove: number) => {
+    setHeroGalleryFiles((current) =>
+      current.filter((_, index) => index !== indexToRemove),
+    );
   };
 
   const resolveHeroImageUrl = (uploadedUrl?: string) => {
@@ -314,10 +375,29 @@ export default function PortalHomeManagementPage() {
         setUploading(false);
       }
 
+      let uploadedGalleryImages: HomeHeroGalleryImage[] = [];
+
+      if (heroGalleryFiles.length > 0) {
+        setUploading(true);
+        uploadedGalleryImages = await Promise.all(
+          heroGalleryFiles.map(async (file, index) => ({
+            url: await uploadHomeImageToStorage(file),
+            alt: `CENL hero photo ${
+              homeForm.heroGalleryImages.length + index + 1
+            }`,
+          })),
+        );
+        setUploading(false);
+      }
+
       const heroImageUrl = resolveHeroImageUrl(uploadedHeroImageUrl);
       const formToSave = {
         ...homeForm,
         heroImageUrl: heroImageUrl ?? "",
+        heroGalleryImages: [
+          ...homeForm.heroGalleryImages,
+          ...uploadedGalleryImages,
+        ].slice(0, maxHeroGalleryImages),
       };
 
       const { error } = await supabase
@@ -332,6 +412,7 @@ export default function PortalHomeManagementPage() {
 
       setSuccessMessage("Homepage content saved.");
       setHeroImageFile(null);
+      setHeroGalleryFiles([]);
       setHeroImageCleared(false);
       setHomeForm(formToSave);
       await loadHomeContent();
@@ -536,6 +617,99 @@ export default function PortalHomeManagementPage() {
               {heroImageFile ? ` Selected: ${heroImageFile.name}` : ""}
             </span>
           </label>
+
+          <section className="rounded-md border border-line bg-white/70 p-4 md:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                  Home Hero Gallery
+                </p>
+                <p className="mt-2 max-w-2xl text-xs leading-6 text-muted">
+                  Upload up to 5 photos for the Home hero carousel. One photo
+                  stays static; multiple photos rotate automatically.
+                </p>
+              </div>
+              <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
+                {homeForm.heroGalleryImages.length + heroGalleryFiles.length}/
+                {maxHeroGalleryImages}
+              </span>
+            </div>
+
+            {homeForm.heroGalleryImages.length > 0 ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {homeForm.heroGalleryImages.map((image, index) => (
+                  <div
+                    key={`${image.url}-${index}`}
+                    className="rounded-md border border-line bg-white p-2"
+                  >
+                    <div
+                      className="h-24 rounded-md bg-cover bg-center"
+                      style={{ backgroundImage: `url(${image.url})` }}
+                      role="img"
+                      aria-label={image.alt || `CENL hero photo ${index + 1}`}
+                    />
+                    <p className="mt-2 truncate text-xs text-muted">
+                      Photo {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removeHeroGalleryImage(index)}
+                      className="mt-2 text-xs font-semibold text-accent transition hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-md border border-dashed border-line bg-white/60 px-3 py-4 text-sm text-muted">
+                No gallery photos uploaded yet.
+              </div>
+            )}
+
+            {heroGalleryFiles.length > 0 ? (
+              <div className="mt-4 rounded-md border border-line bg-[#f9fbfc] p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                  Selected for upload
+                </p>
+                <div className="mt-2 grid gap-2">
+                  {heroGalleryFiles.map((file, index) => (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-xs text-muted"
+                    >
+                      <span className="min-w-0 truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeSelectedGalleryFile(index)}
+                        className="shrink-0 font-semibold text-accent transition hover:text-foreground"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <label className="mt-4 grid gap-1 text-sm font-medium text-muted">
+              <span>Add hero photos</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={handleGalleryFileSelection}
+                disabled={
+                  homeForm.heroGalleryImages.length + heroGalleryFiles.length >=
+                  maxHeroGalleryImages
+                }
+                className="rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition file:mr-3 file:rounded-md file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand focus:border-brand disabled:opacity-60"
+              />
+              <span className="text-xs font-normal text-muted">
+                JPG, PNG, or WEBP. Max 5 MB each. Upload order is preserved.
+              </span>
+            </label>
+          </section>
 
           <div className="flex justify-end md:col-span-2">
             <button

@@ -15,9 +15,15 @@ export type SupabaseHomeContent = {
   latest_publications_title: string | null;
   latest_news_title: string | null;
   hero_image_url: string | null;
+  hero_gallery_images: unknown;
   updated_by: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type HomeHeroGalleryImage = {
+  url: string;
+  alt: string;
 };
 
 export type HomePageContent = {
@@ -33,6 +39,7 @@ export type HomePageContent = {
   latestPublicationsTitle: string;
   latestNewsTitle: string;
   heroImageUrl: string;
+  heroGalleryImages: HomeHeroGalleryImage[];
 };
 
 export const fallbackHomeContent: HomePageContent = {
@@ -50,10 +57,43 @@ export const fallbackHomeContent: HomePageContent = {
   latestPublicationsTitle: "Our Latest Publications",
   latestNewsTitle: "Recent activity from CENL",
   heroImageUrl: "",
+  heroGalleryImages: [],
 };
 
 const homeSelect =
-  "id, hero_title, hero_subtitle, hero_description, primary_button_label, primary_button_href, secondary_button_label, secondary_button_href, research_highlight_title, research_highlight_description, latest_publications_title, latest_news_title, hero_image_url, updated_by, created_at, updated_at";
+  "id, hero_title, hero_subtitle, hero_description, primary_button_label, primary_button_href, secondary_button_label, secondary_button_href, research_highlight_title, research_highlight_description, latest_publications_title, latest_news_title, hero_image_url, hero_gallery_images, updated_by, created_at, updated_at";
+
+function normalizeHeroGalleryImages(
+  images: SupabaseHomeContent["hero_gallery_images"],
+): HomeHeroGalleryImage[] {
+  if (!Array.isArray(images)) {
+    return [];
+  }
+
+  return images
+    .map((image, index) => {
+      if (typeof image === "string") {
+        return { url: image.trim(), alt: `CENL hero photo ${index + 1}` };
+      }
+
+      if (!image || typeof image !== "object") {
+        return null;
+      }
+
+      const item = image as { url?: unknown; alt?: unknown; caption?: unknown };
+      const url = typeof item.url === "string" ? item.url.trim() : "";
+      const alt =
+        typeof item.alt === "string" && item.alt.trim()
+          ? item.alt.trim()
+          : typeof item.caption === "string" && item.caption.trim()
+            ? item.caption.trim()
+            : `CENL hero photo ${index + 1}`;
+
+      return url ? { url, alt } : null;
+    })
+    .filter((image): image is HomeHeroGalleryImage => Boolean(image?.url))
+    .slice(0, 5);
+}
 
 export function mapHomeContent(content: SupabaseHomeContent): HomePageContent {
   return {
@@ -80,6 +120,7 @@ export function mapHomeContent(content: SupabaseHomeContent): HomePageContent {
       fallbackHomeContent.latestPublicationsTitle,
     latestNewsTitle: content.latest_news_title || fallbackHomeContent.latestNewsTitle,
     heroImageUrl: content.hero_image_url ?? "",
+    heroGalleryImages: normalizeHeroGalleryImages(content.hero_gallery_images),
   };
 }
 

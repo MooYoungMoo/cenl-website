@@ -20,6 +20,10 @@ function isVisibleContactValue(value: string) {
   return Boolean(normalized) && normalized !== "tbd";
 }
 
+function normalizeFooterText(value: string) {
+  return value.replace(/\bCENT@KNU\b/g, "CENL");
+}
+
 export function SiteFooter() {
   const [settings, setSettings] =
     useState<SiteSettingsContent>(fallbackSiteSettings);
@@ -63,7 +67,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.3fr_0.8fr_1fr] md:py-14">
         <div className="space-y-4">
           <p className="break-words text-sm font-semibold uppercase tracking-[0.18em] text-brand sm:tracking-[0.28em]">
-            {settings.footerText}
+            {normalizeFooterText(settings.footerText)}
           </p>
           <p className="max-w-md text-sm leading-7 text-muted">
             Advancing chemoelectronic nanomaterials, sensor platforms, and

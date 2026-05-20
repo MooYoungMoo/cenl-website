@@ -40,6 +40,18 @@ export function HomePageContentSection() {
   const [metrics, setMetrics] = useState(quickStats);
   const [researchCards, setResearchCards] =
     useState<HomeResearchCard[]>(researchIdentityCards);
+  const [currentHeroImageIndex, setCurrentHeroImageIndex] = useState(0);
+  const heroImages =
+    content.heroGalleryImages.length > 0
+      ? content.heroGalleryImages
+      : content.heroImageUrl.trim()
+        ? [{ url: content.heroImageUrl.trim(), alt: "Homepage hero image" }]
+        : [];
+  const heroImageCount = heroImages.length;
+  const activeHeroImageIndex = Math.min(
+    currentHeroImageIndex,
+    Math.max(heroImageCount - 1, 0),
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +112,20 @@ export function HomePageContentSection() {
     };
   }, []);
 
+  useEffect(() => {
+    if (heroImageCount <= 1) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setCurrentHeroImageIndex((current) => (current + 1) % heroImageCount);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [content.heroGalleryImages, content.heroImageUrl, heroImageCount]);
+
   return (
     <div>
       <section className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-10 sm:px-6 md:pb-14 md:pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-center">
@@ -130,13 +156,39 @@ export function HomePageContentSection() {
             </Link>
           </div>
         </div>
-        {content.heroImageUrl ? (
+        {heroImageCount > 0 ? (
           <div
-            className="min-h-[280px] rounded-lg bg-cover bg-center sm:min-h-[360px] lg:min-h-[420px]"
-            style={{ backgroundImage: `url(${content.heroImageUrl})` }}
+            className="relative min-h-[280px] overflow-hidden rounded-lg bg-brand-soft shadow-panel sm:min-h-[360px] lg:min-h-[420px]"
             role="img"
-            aria-label="Homepage hero image"
-          />
+            aria-label={
+              heroImages[activeHeroImageIndex]?.alt || "Homepage hero image"
+            }
+          >
+            {heroImages.map((image, index) => (
+              <div
+                key={`${image.url}-${index}`}
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${
+                  index === activeHeroImageIndex ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ backgroundImage: `url(${image.url})` }}
+              />
+            ))}
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#0f2741]/18 via-transparent to-cyan-200/10" />
+            {heroImageCount > 1 ? (
+              <div className="absolute bottom-4 left-4 flex gap-1.5">
+                {heroImages.map((image, index) => (
+                  <span
+                    key={`${image.url}-dot-${index}`}
+                    className={`h-1.5 rounded-full transition-all ${
+                      index === activeHeroImageIndex
+                        ? "w-5 bg-white"
+                        : "w-1.5 bg-white/55"
+                    }`}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : (
           <VisualPlaceholder
             label="Chemoelectronic nanomaterials placeholder"
