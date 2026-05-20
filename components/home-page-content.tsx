@@ -188,12 +188,12 @@ export function HomePageContentSection() {
               <Link
                 key={`${card.title}-${index}`}
                 href="/research"
-                className="flex min-h-[150px] w-[220px] shrink-0 flex-col justify-between rounded-lg border border-brand/15 bg-white/85 p-4 shadow-sm transition hover:border-brand/35 hover:bg-brand-soft/40 sm:w-[240px] md:w-[260px]"
+                className="flex min-h-[150px] w-[220px] shrink-0 flex-col items-start justify-start rounded-lg border border-brand/15 bg-white/85 p-4 shadow-sm transition hover:border-brand/35 hover:bg-brand-soft/40 sm:w-[240px] md:w-[260px]"
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-brand/70">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <h3 className="mt-4 line-clamp-3 text-lg font-semibold leading-snug text-foreground">
+                <h3 className="mt-3 line-clamp-3 text-lg font-semibold leading-snug text-foreground">
                   {card.title}
                 </h3>
               </Link>

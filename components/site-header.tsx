@@ -14,6 +14,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [settings, setSettings] =
     useState<SiteSettingsContent>(fallbackSiteSettings);
+  const logoUrl = settings.logoUrl.trim();
 
   useEffect(() => {
     let mounted = true;
@@ -44,17 +45,25 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between md:py-4">
         <Link
           href="/"
-          className="brand-mark flex h-10 w-fit max-w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-brand/20 bg-brand px-3 text-sm font-semibold text-white md:h-11"
+          className={
+            logoUrl
+              ? "flex h-10 max-w-[12rem] shrink-0 items-center rounded-md px-1 transition hover:opacity-85 md:h-12 md:max-w-[14rem]"
+              : "brand-mark flex h-10 w-fit max-w-full shrink-0 items-center justify-center rounded-lg border border-brand/20 bg-brand px-3 text-sm font-semibold text-white md:h-11"
+          }
           aria-label={settings.siteName || siteMeta.fullName}
         >
-          {settings.logoUrl ? (
+          {logoUrl ? (
             <span
-              className="h-6 w-6 rounded-md bg-white/95 bg-contain bg-center bg-no-repeat"
-              style={{ backgroundImage: `url(${settings.logoUrl})` }}
-              aria-hidden="true"
+              className="block h-9 w-32 max-w-full bg-contain bg-left bg-no-repeat sm:h-10 md:h-12 md:w-40"
+              style={{ backgroundImage: `url(${logoUrl})` }}
+              role="img"
+              aria-label={settings.siteName || siteMeta.fullName}
             />
-          ) : null}
-          <span className="truncate">{settings.headerLabel || siteMeta.shortName}</span>
+          ) : (
+            <span className="truncate">
+              {settings.headerLabel || siteMeta.shortName}
+            </span>
+          )}
         </Link>
         <nav
           className="flex items-center gap-1 overflow-x-auto whitespace-nowrap pb-1 text-sm font-semibold md:justify-end md:gap-2 md:pb-0"

@@ -10,6 +10,30 @@ type LatestNewsSectionProps = {
   title?: string;
 };
 
+function formatHomeNewsDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const parts = new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((accumulator, part) => {
+      if (part.type !== "literal") {
+        accumulator[part.type] = part.value;
+      }
+
+      return accumulator;
+    }, {});
+
+  return [parts.month, parts.day, parts.year].filter(Boolean).join(" ");
+}
+
 export function LatestNewsSection({
   title = "Latest News",
 }: LatestNewsSectionProps) {
@@ -65,7 +89,9 @@ export function LatestNewsSection({
               key={item.slug}
               className="grid gap-2 border-b border-line/70 px-3 py-3 last:border-b-0 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
             >
-              <p className="text-sm font-semibold text-brand">{item.date}</p>
+              <p className="text-sm font-semibold text-brand">
+                {formatHomeNewsDate(item.date)}
+              </p>
               <h3 className="min-w-0 truncate text-base font-semibold text-foreground">
                 {item.title}
               </h3>
