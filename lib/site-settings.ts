@@ -103,6 +103,10 @@ export function buildSiteMetadata(
     },
     description: settings.seoDescription,
     applicationName: settings.siteName,
+    icons: {
+      icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+      shortcut: "/favicon.svg",
+    },
     keywords: [
       "CENL",
       "ChemoElectronic Nanomaterials Lab",
