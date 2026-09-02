@@ -128,17 +128,14 @@ export function HomePageContentSection() {
 
   return (
     <div>
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-10 sm:px-6 md:pb-14 md:pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-center">
+      <section className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-8 sm:px-6 md:pb-12 md:pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-center">
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
             {content.heroSubtitle}
           </p>
-          <h1 className="mt-5 max-w-4xl break-words text-4xl font-semibold leading-tight sm:text-5xl md:text-7xl">
+          <h1 className="mt-4 max-w-4xl break-words text-4xl font-bold leading-[1.06] text-foreground sm:text-5xl md:text-6xl">
             {content.heroTitle}
           </h1>
-          <p className="mt-6 max-w-2xl break-words text-base leading-8 text-muted sm:text-lg">
-            {content.heroDescription}
-          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href={content.primaryButtonHref}

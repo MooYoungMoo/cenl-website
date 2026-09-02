@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
 import { FullImagePreview } from "@/components/full-image-preview";
+import { PublicationBibliographicLine } from "@/components/publication-bibliographic-line";
 import {
   ContributionBadge,
   HighlightedAuthors,
@@ -66,9 +67,12 @@ function PublicationCard({ paper }: { paper: PublicationItem }) {
               highlightedAuthors={paper.highlightedAuthors}
             />
           </p>
-          <p className="mt-1 text-xs font-semibold text-foreground/75 sm:text-sm">
-            {paper.journal} | {paper.year}
-          </p>
+          <PublicationBibliographicLine
+            journal={paper.journal}
+            bibliographicDetails={paper.bibliographicDetails}
+            year={paper.year}
+            className="mt-1 text-sm leading-5 sm:text-base sm:leading-6"
+          />
         </div>
       </div>
     </article>

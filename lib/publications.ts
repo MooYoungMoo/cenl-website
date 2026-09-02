@@ -6,6 +6,7 @@ export type SupabasePublication = {
   title: string;
   authors: string;
   journal: string;
+  bibliographic_details?: string | null;
   publication_year: number | null;
   doi: string | null;
   publication_type: string | null;
@@ -23,7 +24,7 @@ export type SupabasePublication = {
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, bibliographic_details, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
 
 function isUrl(value: string) {
   return /^https?:\/\//i.test(value);
@@ -39,6 +40,8 @@ export function mapPublicationRecord(
     title: publication.title,
     authors: publication.authors,
     journal: publication.journal,
+    bibliographicDetails:
+      publication.bibliographic_details?.trim() || undefined,
     year: String(publication.publication_year ?? "TBD"),
     label: publication.publication_type?.trim() || "Article",
     doi,

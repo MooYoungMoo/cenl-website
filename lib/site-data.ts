@@ -431,6 +431,7 @@ export type PublicationItem = {
   title: string;
   authors: string;
   journal: string;
+  bibliographicDetails?: string;
   year: string;
   label: string;
   doi: string;

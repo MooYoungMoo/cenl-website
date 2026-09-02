@@ -14,7 +14,6 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Contact"
         title="Join CENL or start a research conversation"
-        description="Contact information and student recruiting details are organized here as editable frontend content."
       />
       <ContactContentSection />
     </div>

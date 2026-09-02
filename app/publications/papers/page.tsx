@@ -14,7 +14,6 @@ export default function PapersPage() {
       <PageHero
         eyebrow="Papers"
         title="Selected papers and manuscript records"
-        description="Paper entries load from managed publication records with static CENL fallback data kept in place for resilience."
       />
       <PapersPublicationsList />
     </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FileText } from "lucide-react";
+import { PublicationBibliographicLine } from "@/components/publication-bibliographic-line";
 import type { PublicationItem } from "@/lib/site-data";
 
 type PublicationCarouselProps = {
@@ -33,9 +34,14 @@ function PublicationCard({ item }: { item: PublicationItem }) {
         <h3 className="line-clamp-2 break-words text-sm font-semibold leading-5 sm:text-base sm:leading-6">
           {item.title}
         </h3>
-        <p className="mt-1.5 line-clamp-1 text-xs font-semibold text-cyan-100 sm:text-sm">
-          {item.journal} · {item.year}
-        </p>
+        <PublicationBibliographicLine
+          journal={item.journal}
+          bibliographicDetails={item.bibliographicDetails}
+          year={item.year}
+          separator="·"
+          tone="overlay"
+          className="mt-1.5 line-clamp-1 text-sm leading-5 sm:text-base sm:leading-6"
+        />
       </div>
     </>
   );

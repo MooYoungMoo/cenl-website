@@ -32,6 +32,7 @@ type PublicationForm = {
   title: string;
   authors: string;
   journal: string;
+  bibliographicDetails: string;
   publicationYear: string;
   doi: string;
   publicationType: string;
@@ -49,6 +50,7 @@ const emptyPublicationForm: PublicationForm = {
   title: "",
   authors: "",
   journal: "",
+  bibliographicDetails: "",
   publicationYear: "",
   doi: "",
   publicationType: "Article",
@@ -63,7 +65,7 @@ const emptyPublicationForm: PublicationForm = {
 };
 
 const publicationSelect =
-  "id, title, authors, journal, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
+  "id, title, authors, journal, bibliographic_details, publication_year, doi, publication_type, image_url, highlighted_authors, lab_contribution, is_cover_article, cover_label, is_featured, is_visible, display_order, created_by, created_at, updated_at";
 
 const contributionOptions = [
   { value: "none", label: "No badge" },
@@ -92,6 +94,7 @@ function toPublicationForm(publication: PublicationRecord): PublicationForm {
     title: publication.title ?? "",
     authors: publication.authors ?? "",
     journal: publication.journal ?? "",
+    bibliographicDetails: publication.bibliographic_details ?? "",
     publicationYear: String(publication.publication_year ?? ""),
     doi: publication.doi ?? "",
     publicationType: publication.publication_type ?? "Article",
@@ -128,6 +131,7 @@ function getPublicationPayload(
     title: form.title.trim(),
     authors: form.authors.trim(),
     journal: form.journal.trim(),
+    bibliographic_details: form.bibliographicDetails.trim() || null,
     publication_year: Number(form.publicationYear),
     doi: form.doi.trim() || null,
     publication_type: form.publicationType.trim() || "Article",
@@ -221,6 +225,7 @@ function isMatchingSearch(publication: PublicationRecord, search: string) {
     publication.title,
     publication.authors,
     publication.journal,
+    publication.bibliographic_details,
     publication.doi,
   ]
     .join(" ")
@@ -799,6 +804,20 @@ export default function PortalPublicationsPage() {
         placeholder="Journal"
         required
       />
+      <label className="grid gap-1 text-sm font-medium text-muted lg:col-span-2">
+        <span>Volume / Article / Pages</span>
+        <input
+          value={form.bibliographicDetails}
+          onChange={(event) =>
+            onChange("bibliographicDetails", event.target.value)
+          }
+          className="rounded-md border border-line bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-brand"
+          placeholder="e73406 or 35(3) 191–215"
+        />
+        <span className="text-xs font-normal">
+          Enter volume, issue, pages, or article number only.
+        </span>
+      </label>
       <input
         type="number"
         value={form.publicationYear}
@@ -1136,7 +1155,7 @@ export default function PortalPublicationsPage() {
                     <span>Thumbnail</span>
                     <span>Year</span>
                     <span>Title</span>
-                    <span>Journal</span>
+                    <span>Journal / Details</span>
                     <span>Type</span>
                     <span>Cover</span>
                     <span>Featured</span>
@@ -1174,9 +1193,14 @@ export default function PortalPublicationsPage() {
                               </p>
                             ) : null}
                           </div>
-                          <p className="line-clamp-2 text-sm text-muted">
-                            {publication.journal}
-                          </p>
+                          <div className="min-w-0 text-sm text-muted">
+                            <p className="line-clamp-1">{publication.journal}</p>
+                            {publication.bibliographic_details ? (
+                              <p className="mt-1 line-clamp-1 text-xs">
+                                {publication.bibliographic_details}
+                              </p>
+                            ) : null}
+                          </div>
                           <p className="text-sm text-muted">
                             {publication.publication_type || "Article"}
                           </p>

@@ -14,7 +14,6 @@ export default function PatentsPage() {
       <PageHero
         eyebrow="Patents"
         title="Patent and invention disclosure records"
-        description="Visible patent records load from Supabase with a static fallback kept in place for resilience."
       />
       <PatentsPublicationsList />
     </div>

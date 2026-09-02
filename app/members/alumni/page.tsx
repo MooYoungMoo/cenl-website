@@ -14,7 +14,6 @@ export default function AlumniPage() {
       <PageHero
         eyebrow="Alumni"
         title="CENL alumni and former lab members"
-        description="This page is prepared for former student and researcher profiles with current affiliation placeholders."
       />
       <AlumniSection />
     </div>

@@ -44,14 +44,9 @@ export function OngoingProjectsSection() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
           Ongoing Projects
         </p>
-        <h2 className="mt-4 break-words text-2xl font-semibold sm:text-3xl">
+        <h2 className="mt-3 max-w-4xl break-words text-2xl font-bold leading-tight sm:text-3xl">
           Current funded research activities
         </h2>
-        <p className="mt-3 max-w-3xl break-words text-sm leading-7 text-muted">
-          Active projects connect CENL&apos;s chemoelectronic nanomaterials
-          research with sensor systems, semiconductor devices, and
-          materials-based sensing platforms.
-        </p>
       </div>
 
       <div className="mt-8 grid gap-4">

@@ -16,7 +16,6 @@ export default function MembersPage() {
       <PageHero
         eyebrow="Members"
         title="People"
-        description="Meet the members of CENL."
       />
       <section className="mx-auto grid max-w-6xl gap-6 px-6 md:grid-cols-3">
         {memberSections.map((section) => {
@@ -29,8 +28,7 @@ export default function MembersPage() {
             >
               <Icon className="h-7 w-7 text-brand" />
               <h2 className="mt-5 text-2xl font-semibold">{section.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-muted">{section.description}</p>
-              <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand">
+              <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-brand">
                 Open page
                 <ArrowRight className="h-4 w-4" />
               </span>

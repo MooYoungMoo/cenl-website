@@ -15,14 +15,13 @@ export default function ResearchPage() {
       <PageHero
         eyebrow="Research"
         title="Intelligent Chemical Perception"
-        description="CENL develops chemoelectronic nanomaterials, MOFs, sensor arrays, and molecular recognition strategies that translate gas interactions into information-rich chemical signals."
       />
       <OngoingProjectsSection />
       <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
           Research Directions
         </p>
-        <h2 className="mt-4 break-words text-2xl font-semibold sm:text-3xl">
+        <h2 className="mt-3 max-w-4xl break-words text-2xl font-bold leading-tight sm:text-3xl">
           Core directions in chemoelectronic sensing
         </h2>
       </section>

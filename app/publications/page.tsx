@@ -17,7 +17,6 @@ export default function PublicationsPage() {
       <PageHero
         eyebrow="Publications"
         title="Papers and patents from CENL"
-        description="The publications section is prepared as two subpages, keeping scholarly papers and intellectual property entries easy to maintain."
       />
       <section className="mx-auto max-w-7xl px-6">
         <CoverCarousel />
@@ -33,8 +32,7 @@ export default function PublicationsPage() {
             >
               <Icon className="h-7 w-7 text-brand" />
               <h2 className="mt-5 text-2xl font-semibold">{section.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-muted">{section.description}</p>
-              <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-brand">
+              <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-brand">
                 Browse {section.title.toLowerCase()}
                 <ArrowRight className="h-4 w-4" />
               </span>
